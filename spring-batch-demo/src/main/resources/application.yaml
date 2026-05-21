@@ -1,0 +1,40 @@
+server:
+  port: 2028
+
+debug: true
+
+spring:
+  application:
+    name: spring-batch-demo
+  datasource:
+    url: jdbc:mysql://localhost:30036/testdb
+    password: root123
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 2
+      connection-timeout: 20000
+      idle-timeout: 300000
+      auto-commit: true
+
+  jpa:
+      hibernate:
+      ddl-auto: update
+      show-sql: true
+      properties:
+        hibernate:
+          dialect: org.hibernate.dialect.MySQLDialect
+          enable_lazy_load_no_trans: true
+
+      database-platform: org.hibernate.dialect.MySQLDialect
+      database: mysql
+
+  batch:
+    jdbc:
+      initialize-schema: always
+
+    job:
+      enabled: true
+
+logging:
+  level:
+    org.springframework.batch: INFO

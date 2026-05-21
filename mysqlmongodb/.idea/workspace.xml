@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="4d0a5f86-6fc6-4a93-9737-ef1bec3d1d62" name="Changes" comment="Microservices with connecting Mysql and Mongo DB">
+      <change beforePath="$PROJECT_DIR$/../mysql-mongodb/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/../mysql-mongodb/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mysql-mongodb/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../mysql-mongodb/pom.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/mysqlmongodb/MysqlmongodbApplication.java" beforeDir="false" afterPath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/user/MysqlmongodbApplication.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/mysqlmongodb/config/CacheConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/user/config/CacheConfig.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/mysqlmongodb/config/JpaConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/user/config/JpaConfig.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/mysqlmongodb/config/MongoConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/user/config/MongoConfig.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/mysqlmongodb/controller/OrderController.java" beforeDir="false" afterPath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/user/controller/OrderController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/mysqlmongodb/controller/UserController.java" beforeDir="false" afterPath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/user/controller/UserController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/mysqlmongodb/dto/OrderDto.java" beforeDir="false" afterPath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/user/dto/OrderDto.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/mysqlmongodb/dto/UserDto.java" beforeDir="false" afterPath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/user/dto/UserDto.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/mysqlmongodb/exception/GlobalExceptionHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/user/exception/GlobalExceptionHandler.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/mysqlmongodb/exception/ResourceNotFoundException.java" beforeDir="false" afterPath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/user/exception/ResourceNotFoundException.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/mysqlmongodb/mapper/OrderMapper.java" beforeDir="false" afterPath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/user/mapper/OrderMapper.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/mysqlmongodb/mapper/UserMapper.java" beforeDir="false" afterPath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/user/mapper/UserMapper.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/mysqlmongodb/mongodb/document/Order.java" beforeDir="false" afterPath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/user/mongodb/document/Order.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/mysqlmongodb/mongodb/repository/OrderRepository.java" beforeDir="false" afterPath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/user/mongodb/repository/OrderRepository.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/mysqlmongodb/mysql/entity/User.java" beforeDir="false" afterPath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/user/mysql/entity/User.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/mysqlmongodb/mysql/repository/UserRepository.java" beforeDir="false" afterPath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/user/mysql/repository/UserRepository.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/mysqlmongodb/service/OrderService.java" beforeDir="false" afterPath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/user/service/OrderService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/mysqlmongodb/service/UserService.java" beforeDir="false" afterPath="$PROJECT_DIR$/../mysql-mongodb/src/main/java/com/user/service/UserService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../mysql-mongodb/src/test/java/com/mysqlmongodb/MysqlmongodbApplicationTests.java" beforeDir="false" afterPath="$PROJECT_DIR$/../mysql-mongodb/src/test/java/com/user/MysqlmongodbApplicationTests.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/compiler.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/encodings.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../user-service/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/../user-service/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../user-service/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../user-service/pom.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../user-service/src/main/java/com/mysqlmongodb/UserServiceApplication.java" beforeDir="false" afterPath="$PROJECT_DIR$/../user-service/src/main/java/com/user/UserServiceApplication.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../user-service/src/main/java/com/mysqlmongodb/config/CacheConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/../user-service/src/main/java/com/user/config/CacheConfig.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../user-service/src/main/java/com/mysqlmongodb/config/JpaConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/../user-service/src/main/java/com/user/config/JpaConfig.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../user-service/src/main/java/com/mysqlmongodb/controller/UserController.java" beforeDir="false" afterPath="$PROJECT_DIR$/../user-service/src/main/java/com/user/controller/UserController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../user-service/src/main/java/com/mysqlmongodb/dto/UserDto.java" beforeDir="false" afterPath="$PROJECT_DIR$/../user-service/src/main/java/com/user/dto/UserDto.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../user-service/src/main/java/com/mysqlmongodb/exception/GlobalExceptionHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/../user-service/src/main/java/com/user/exception/GlobalExceptionHandler.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../user-service/src/main/java/com/mysqlmongodb/exception/ResourceNotFoundException.java" beforeDir="false" afterPath="$PROJECT_DIR$/../user-service/src/main/java/com/user/exception/ResourceNotFoundException.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../user-service/src/main/java/com/mysqlmongodb/mapper/UserMapper.java" beforeDir="false" afterPath="$PROJECT_DIR$/../user-service/src/main/java/com/user/mapper/UserMapper.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../user-service/src/main/java/com/mysqlmongodb/mysql/entity/User.java" beforeDir="false" afterPath="$PROJECT_DIR$/../user-service/src/main/java/com/user/mysql/entity/User.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../user-service/src/main/java/com/mysqlmongodb/mysql/repository/UserRepository.java" beforeDir="false" afterPath="$PROJECT_DIR$/../user-service/src/main/java/com/user/mysql/repository/UserRepository.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../user-service/src/main/java/com/mysqlmongodb/service/OrderService.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../user-service/src/main/java/com/mysqlmongodb/service/UserService.java" beforeDir="false" afterPath="$PROJECT_DIR$/../user-service/src/main/java/com/user/service/UserService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../user-service/src/main/resources/application.properties" beforeDir="false" afterPath="$PROJECT_DIR$/../user-service/src/main/resources/application.properties" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../user-service/src/test/java/com/mysqlmongodb/MysqlmongodbApplicationTests.java" beforeDir="false" afterPath="$PROJECT_DIR$/../user-service/src/test/java/com/user/MysqlmongodbApplicationTests.java" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="CopilotChats">
+    <option name="panelChat">
+      <chat>
+        <option name="activeSessionId" value="36c20baa-5686-45d2-b368-bd3d45815cb9" />
+        <option name="sessions">
+          <session>
+            <option name="chatType" value="PANEL" />
+            <option name="id" value="d30179a1-7eed-413b-bf58-abe137d1e78e" />
+            <option name="modeId" value="Agent" />
+            <option name="modelType" value="builtin_family" />
+            <option name="modelValue" value="auto" />
+            <option name="status" value="Stopped" />
+            <option name="targetType" value="LOCAL" />
+          </session>
+          <session>
+            <option name="chatType" value="PANEL" />
+            <option name="id" value="d8f27f9c-7490-41ae-82d4-70cfec16964d" />
+            <option name="modeId" value="Ask" />
+            <option name="modelType" value="builtin_family" />
+            <option name="modelValue" value="auto" />
+            <option name="targetType" value="LOCAL" />
+          </session>
+          <session>
+            <option name="chatType" value="PANEL" />
+            <option name="id" value="adae2e94-5a92-4b4d-a3cf-38fd3ffea8b8" />
+            <option name="modeId" value="Agent" />
+            <option name="modelType" value="builtin_family" />
+            <option name="modelValue" value="auto" />
+            <option name="targetType" value="LOCAL" />
+          </session>
+          <session>
+            <option name="chatType" value="PANEL" />
+            <option name="id" value="6081fe95-0e1f-4fc5-9e45-24c767d2a9ef" />
+            <option name="modeId" value="Agent" />
+            <option name="modelType" value="builtin_family" />
+            <option name="modelValue" value="auto" />
+            <option name="targetType" value="LOCAL" />
+          </session>
+          <session>
+            <option name="chatType" value="PANEL" />
+            <option name="id" value="ed3c71e6-d188-44bd-a5f8-7bb25b08ba49" />
+            <option name="modeId" value="Agent" />
+            <option name="modelType" value="builtin_family" />
+            <option name="modelValue" value="auto" />
+            <option name="targetType" value="LOCAL" />
+          </session>
+          <session>
+            <option name="chatType" value="PANEL" />
+            <option name="id" value="36c20baa-5686-45d2-b368-bd3d45815cb9" />
+            <option name="modeId" value="Agent" />
+            <option name="modelType" value="builtin_family" />
+            <option name="modelValue" value="auto" />
+            <option name="status" value="Completed" />
+            <option name="targetType" value="LOCAL" />
+          </session>
+          <session>
+            <option name="chatType" value="PANEL" />
+            <option name="id" value="613760f0-69b7-470b-bd45-85bce2c445ec" />
+            <option name="modeId" value="Agent" />
+            <option name="modelType" value="builtin_family" />
+            <option name="modelValue" value="auto" />
+            <option name="targetType" value="LOCAL" />
+          </session>
+        </option>
+        <option name="type" value="PANEL" />
+      </chat>
+    </option>
+  </component>
+  <component name="CopilotPersistence">
+    <persistenceIdMap>
+      <entry key="_C:/git-hub/microservices/mysqlmongodb" value="3DpxiQQrmW7Dzw0lWTaPyDwmfEC" />
+    </persistenceIdMap>
+  </component>
+  <component name="CopilotUserSelectedModel">
+    <selectedModels>
+      <entry key="agent-panel" value="Auto" />
+      <entry key="chat-panel" value="Auto" />
+    </selectedModels>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;chandrapalerla&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/chandrapalerla/microservices.git&quot;,
+    &quot;accountId&quot;: &quot;d26dc017-7a56-43e1-bdf3-6b4c6f43e618&quot;
+  }
+}</component>
+  <component name="MavenImportPreferences">
+    <option name="generalSettings">
+      <MavenGeneralSettings>
+        <option name="localRepository" value="C:\repo" />
+        <option name="mavenHomeTypeForPersistence" value="WRAPPER" />
+        <option name="userSettingsFile" value="C:\softwares\apache-maven-3.9.12\conf\settings.xml" />
+      </MavenGeneralSettings>
+    </option>
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 2
+}</component>
+  <component name="ProjectId" id="3DpxiQQrmW7Dzw0lWTaPyDwmfEC" />
+  <component name="ProjectSessionTemplates">
+    <option name="panelTemplate">
+      <template>
+        <option name="modeId" value="Agent" />
+        <option name="model">
+          <model>
+            <option name="modelType" value="builtin_family" />
+            <option name="modelValue" value="auto" />
+          </model>
+        </option>
+        <option name="targetType" value="LOCAL" />
+      </template>
+    </option>
+  </component>
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Maven.mysqlmongodb [clean].executor": "Run",
+    "Maven.mysqlmongodb [compile].executor": "Run",
+    "Maven.mysqlmongodb [package].executor": "Run",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "Spring Boot.MysqlmongodbApplication.executor": "Run",
+    "Spring Boot.UserServiceApplication.executor": "Run",
+    "git-widget-placeholder": "main",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "C:/git-hub/microservices/mysqlmongodb/pom.xml",
+    "project.structure.last.edited": "Modules",
+    "project.structure.proportion": "0.15",
+    "project.structure.side.proportion": "0.2",
+    "settings.editor.selected.configurable": "reference.projectsettings.compiler.javacompiler"
+  }
+}]]></component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\git-hub\microservices\mysqlmongodb\src\main\java\com\mysqlmongodb" />
+    </key>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-jdk-30f59d01ecdd-2fc7cc6b9a17-intellij.indexing.shared.core-IU-253.31033.145" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="4d0a5f86-6fc6-4a93-9737-ef1bec3d1d62" name="Changes" comment="" />
+      <created>1778992940932</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1778992940932</updated>
+    </task>
+    <task id="LOCAL-00001" summary="Microservices with connecting Mysql and Mongo DB">
+      <option name="closed" value="true" />
+      <created>1779012176901</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1779012176902</updated>
+    </task>
+    <task id="LOCAL-00002" summary="Microservices with connecting Mysql and Mongo DB">
+      <option name="closed" value="true" />
+      <created>1779163626756</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1779163626756</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
+    <servers />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="Microservices with connecting Mysql and Mongo DB" />
+    <option name="LAST_COMMIT_MESSAGE" value="Microservices with connecting Mysql and Mongo DB" />
+  </component>
+  <component name="XSLT-Support.FileAssociations.UIState">
+    <expand />
+    <select />
+  </component>
+  <component name="github-copilot-workspace">
+    <instructionFileLocations>
+      <option value=".github/instructions" />
+    </instructionFileLocations>
+    <promptFileLocations>
+      <option value=".github/prompts" />
+    </promptFileLocations>
+  </component>
+</project>

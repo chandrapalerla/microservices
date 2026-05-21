@@ -18,7 +18,7 @@ This project demonstrates a simple microservice that uses:
 - MySQL via Spring Data JPA for `User` entities
 - MongoDB via Spring Data MongoDB for `Order` documents
 
-The service exposes CRUD operations through controllers and uses repositories located under `com.mysqlmongodb.mysql.repository` and `com.mysqlmongodb.mongodb.repository`.
+The service exposes CRUD operations through controllers and uses repositories located under `com.user.mysql.repository` and `com.user.mongodb.repository`.
 
 ## Prerequisites
 - Java (JDK) compatible with the project. The `pom.xml` currently declares `java.version=25` — ensure you have a compatible JDK installed.
@@ -128,9 +128,9 @@ docker compose up -d
    - Fix: Ensure MySQL is running and listening on `localhost:3306` and that credentials and database exist. You can start MySQL as a Windows service or run a Docker MySQL container.
 
 3. Bean not found for repository (e.g. `OrderRepository`)
-   - Symptom: `Parameter 0 of constructor in ... required a bean of type 'com.mysqlmongodb.mongodb.repository.OrderRepository' that could not be found.`
+   - Symptom: `Parameter 0 of constructor in ... required a bean of type 'com.user.mongodb.repository.OrderRepository' that could not be found.`
    - Fixes applied in this repo:
-     - Ensure repository packages are scanned: `@EnableMongoRepositories(basePackages = "com.mysqlmongodb.mongodb.repository")` and `@EnableJpaRepositories(basePackages = "com.mysqlmongodb.mysql.repository")` in `src/main/java/com/mysqlmongodb/config/*.java`.
+     - Ensure repository packages are scanned: `@EnableMongoRepositories(basePackages = "com.user.mongodb.repository")` and `@EnableJpaRepositories(basePackages = "com.user.mysql.repository")` in `src/main/java/com/mysqlmongodb/config/*.java`.
      - Use constructor injection (Lombok `@RequiredArgsConstructor`) and avoid mixing `@Autowired` on final fields.
 
 4. Application not starting due to `main` method
@@ -150,8 +150,8 @@ logging.level.com.mysql.cj.jdbc=DEBUG
 
 ## Development notes
 - Repositories are under:
-  - `com.mysqlmongodb.mysql.repository` (JPA)
-  - `com.mysqlmongodb.mongodb.repository` (MongoDB)
+  - `com.user.mysql.repository` (JPA)
+  - `com.user.mongodb.repository` (MongoDB)
 - Services use Lombok `@RequiredArgsConstructor` for constructor-based dependency injection. If Lombok is not enabled in your IDE, enable annotation processing.
 - The `pom.xml` contains Spring Boot and dependencies for Spring Data JPA, Spring Data MongoDB, Web, and springdoc OpenAPI.
 
