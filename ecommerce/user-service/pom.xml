@@ -52,10 +52,14 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-validation</artifactId>
 		</dependency>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-web</artifactId>
-		</dependency>
+		<!--
+		  spring-boot-starter-web deliberately REMOVED.
+		  WHY: having both spring-boot-starter-web (Tomcat/MVC) and spring-boot-starter-webflux
+		  (Netty/WebFlux) on the classpath conflicts in Pageable argument resolution and
+		  Page<T> serialization even when spring.main.web-application-type=reactive forces
+		  WebFlux mode.  All @RestController, ResponseEntity, and @Valid imports come from
+		  spring-web, which spring-boot-starter-webflux already pulls in transitively.
+		-->
 		<!-- Spring Cloud Eureka Client for Service Discovery -->
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>

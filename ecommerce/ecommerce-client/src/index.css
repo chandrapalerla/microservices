@@ -1,0 +1,48 @@
+/* ─── Tailwind CSS v4 ──────────────────────────────────────────────────────── */
+@import "tailwindcss";
+
+/*
+ * Class-based dark mode.
+ * ThemeContext toggles the `dark` class on <html>.
+ * This variant tells Tailwind to apply dark: utilities when any ancestor
+ * has the `dark` class.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ─── Base resets ──────────────────────────────────────────────────────────── */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* Make the root fill the viewport without constraining width */
+#root {
+  min-height: 100dvh;
+}
+
+/* ─── Scrollbar (Webkit) ───────────────────────────────────────────────────── */
+
+::-webkit-scrollbar        { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: #cbd5e1; border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+.dark ::-webkit-scrollbar-thumb       { background: #334155; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+/* ─── Native <dialog> backdrop ────────────────────────────────────────────── */
+dialog::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}

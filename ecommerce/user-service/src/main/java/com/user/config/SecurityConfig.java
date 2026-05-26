@@ -1,89 +1,89 @@
 package com.user.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.reactive.CorsConfigurationSource;
-import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
-
-import java.util.Arrays;
-import java.util.Collections;
+import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.server.WebFilter;
+import org.springframework.web.server.WebFilterChain;
+import reactor.core.publisher.Mono;
 
 /**
- * Spring Security configuration for User Service
- * Configures JWT token validation and role-based method-level security with WebFlux
+ * Security for user-service — two layers of protection:
+ *
+ *  Layer 1 │ gatewaySecretFilter
+ *          │ Every /api/** request must carry X-Gateway-Secret (added by GatewayConfig).
+ *          │ Direct calls from browsers/curl get 403 before touching any business logic.
+ *
+ *  Layer 2 │ JWT resource-server (defence-in-depth)
+ *          │ Re-validates the Bearer token even though the gateway already validated it.
+ *          │ Guards against misconfigured network policies that might bypass the gateway.
+ *
+ * NO CORS config here — CORS only applies when a browser contacts a server directly.
+ * Browsers always go through the gateway (:2027), which owns the CORS configuration.
+ * Server-to-server calls (gateway → this service) never trigger CORS preflight.
  */
 @Configuration
 @EnableWebFluxSecurity
 @EnableMethodSecurity(prePostEnabled = true, securedEnabled = true, jsr250Enabled = true)
 public class SecurityConfig {
 
+    /** Must match gateway.internal-secret in apigateway/application.yaml */
+    @Value("${gateway.internal-secret}")
+    private String gatewaySecret;
+
     /**
-     * Configure security filter chain for JWT authentication with WebFlux
+     * Layer 1 — blocks direct access, passes gateway-forwarded requests through.
      */
     @Bean
-    public SecurityWebFilterChain springSecurityFilterChain(
-            ServerHttpSecurity http) {
+    public WebFilter gatewaySecretFilter() {
+        return (ServerWebExchange exchange, WebFilterChain chain) -> {
+            String path = exchange.getRequest().getPath().value();
 
+            if (path.startsWith("/api/")) {
+                String incoming = exchange.getRequest()
+                        .getHeaders()
+                        .getFirst("X-Gateway-Secret");
+
+                if (!gatewaySecret.equals(incoming)) {
+                    exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
+                    return exchange.getResponse().setComplete();
+                }
+            }
+            return chain.filter(exchange);
+        };
+    }
+
+    /**
+     * Layer 2 — JWT validation + role-based access rules.
+     */
+    @Bean
+    public SecurityWebFilterChain securityFilterChain(ServerHttpSecurity http) {
         http
             .csrf(ServerHttpSecurity.CsrfSpec::disable)
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .cors(ServerHttpSecurity.CorsSpec::disable)   // gateway owns CORS, not this service
             .authorizeExchange(exchanges -> exchanges
-
-                // Public endpoints
+                // Swagger UI served directly — no token or gateway secret needed
                 .pathMatchers(
-                        "/health/**",
                         "/swagger-ui/**",
-                        "/v3/api-docs/**",
-                        "/*.html"
+                        "/v3/api-docs/**"
                 ).permitAll()
 
-                // User endpoints require USER or ADMIN role
-                .pathMatchers("/api/v1/users/**")
-                .hasAnyRole("USER", "ADMIN")
+                // Business endpoints — roles enforced at gateway AND here (defence-in-depth)
+                .pathMatchers("/api/v1/users/**").hasAnyRole("USER", "ADMIN")
+                .pathMatchers("/api/v1/auth/**").authenticated()
 
-                // All other endpoints require authentication
-                .anyExchange()
-                .authenticated()
+                .anyExchange().authenticated()
             )
-
-            // OAuth2 Resource Server — use Keycloak JWT converter so
-            // realm_access.roles is mapped to ROLE_USER / ROLE_ADMIN authorities
             .oauth2ResourceServer(oauth2 ->
                     oauth2.jwt(jwt ->
                         jwt.jwtAuthenticationConverter(KeycloakJwtConverter.reactive())));
 
         return http.build();
     }
-
-    /**
-     * CORS configuration for reactive/WebFlux endpoints
-     */
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration corsConfig = new CorsConfiguration();
-        corsConfig.setAllowedOrigins(Arrays.asList(
-            "http://localhost:3000",
-            "http://localhost:4200",
-            "http://localhost:2027"  // API Gateway
-        ));
-        corsConfig.setAllowedMethods(Arrays.asList(
-            "GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"
-        ));
-        corsConfig.setAllowedHeaders(Collections.singletonList("*"));
-        corsConfig.setExposedHeaders(Arrays.asList(
-            "Authorization", "X-Total-Count", "X-Page-Count"
-        ));
-        corsConfig.setAllowCredentials(true);
-        corsConfig.setMaxAge(3600L);
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", corsConfig);
-        return source;
-    }
 }
-

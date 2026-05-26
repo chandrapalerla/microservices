@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Caching;
 
 import java.util.List;
 import org.springframework.data.domain.Page;
@@ -61,7 +62,10 @@ public class UserService {
     }
 
     @Transactional
-    @CacheEvict(value = "users", key = "#id")
+    @Caching(evict = {
+        @CacheEvict(value = "users",     key = "#id"),
+        @CacheEvict(value = "usersPage", allEntries = true)   // invalidate all pages on delete
+    })
     public void delete(Long id) {
         userRepository.deleteById(id);
     }

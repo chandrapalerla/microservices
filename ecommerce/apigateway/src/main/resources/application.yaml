@@ -1,9 +1,6 @@
 server:
   port: 2027
 
-# Enable Spring Boot debug logging and startup diagnostics
-#debug: true
-
 spring:
   application:
     name: apigateway
@@ -12,59 +9,42 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          # Use jwk-set-uri (not issuer-uri) — avoids eager Keycloak connection at startup.
-          # App starts fine even if Keycloak is not yet running; keys are fetched lazily on first request.
+          # jwk-set-uri (not issuer-uri) — keys are fetched lazily on first request,
+          # so the app starts even when Keycloak is not yet running.
           jwk-set-uri: http://localhost:30080/realms/microservices-realm/protocol/openid-connect/certs
       client:
         registration:
           keycloak:
             client-id: apigateway-client
-            client-secret: your-client-secret          # replace with real secret after Keycloak setup
+            client-secret: your-client-secret        # replace after Keycloak setup
             authorization-grant-type: authorization_code
             redirect-uri: http://localhost:2027/login/oauth2/code/keycloak
             scope: openid, profile, email
         provider:
           keycloak:
-            # Explicit URIs instead of issuer-uri — Spring Boot resolves issuer-uri EAGERLY
-            # at startup (fetches /.well-known/openid-configuration) causing startup failure
-            # when the Keycloak realm doesn't exist yet.
             authorization-uri: http://localhost:30080/realms/microservices-realm/protocol/openid-connect/auth
             token-uri: http://localhost:30080/realms/microservices-realm/protocol/openid-connect/token
             jwk-set-uri: http://localhost:30080/realms/microservices-realm/protocol/openid-connect/certs
             user-info-uri: http://localhost:30080/realms/microservices-realm/protocol/openid-connect/userinfo
             user-name-attribute: preferred_username
 
-  cloud:
-    gateway:
-      discovery:
-        locator:
-          enabled: true
-          lower-case-service-id: true
-      routes:
-        # Route all user CRUD requests to user-service
-        - id: user-service-route
-          uri: lb://USER-SERVICE
-          predicates:
-            - Path=/api/v1/users/**
-
-        # Route user auth endpoints (login, logout, me) to user-service
-        - id: user-auth-route
-          uri: lb://USER-SERVICE
-          predicates:
-            - Path=/api/v1/auth/**
-
 eureka:
   client:
     service-url:
       defaultZone: http://localhost:8761/eureka
+  instance:
+    prefer-ip-address: true
 
-# Keycloak Configuration
-keycloak:
-  realm: microservices-realm
-  auth-server-url: http://localhost:30080
-  resource: apigateway-client
-  public-client: false
-  credentials:
-    secret: your-client-secret
-
-kind: Application
+# Shared secret stamped on every request the gateway forwards downstream.
+# Each microservice reads this and rejects requests that don't carry it,
+# preventing clients from hitting services directly.
+# Change this value and mirror it in every service's application.properties.
+gateway:
+  internal-secret: gw-secret-change-in-prod
+  # Direct service URLs used for routing.
+  # WHY not lb://: HandlerFunctions.http() creates its own RestClient that is
+  # not load-balancer-aware, so lb:// reaches Apache HC5 unresolved.
+  # In Kubernetes, replace with the cluster-DNS name
+  # (e.g. http://user-service.default.svc.cluster.local:2026).
+  routes:
+    user-service: http://localhost:2026

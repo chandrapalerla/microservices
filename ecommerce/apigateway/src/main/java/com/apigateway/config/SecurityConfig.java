@@ -6,76 +6,72 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import com.apigateway.filter.TokenPropagationFilter;
 
 import java.util.Arrays;
 import java.util.Collections;
 
 /**
- * Spring Security configuration for API Gateway
- * Configures JWT token validation, role-based authorization, and CORS
+ * Gateway security: validates incoming JWTs from Keycloak and enforces route-level roles.
+ *
+ * HOW TO ADD A NEW MICROSERVICE:
+ * Add its public paths to the permitAll() block and its secured paths below that.
+ * The JWT validation and stateless session policy apply to every route automatically.
  */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
-    /**
-     * Configure security filter chain for JWT authentication
-     */
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, TokenPropagationFilter tokenPropagationFilter)
-            throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .sessionManagement(session ->
+                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(authz -> authz
-                // Public endpoints (gateway-level health & docs)
+                // ── Public (no token needed) ──────────────────────────────
                 .requestMatchers(
-                        "/auth/login",
                         "/auth/health",
-                        "/health",
-                        "/actuator/health",
-                        "/swagger-ui/**",
-                        "/v3/api-docs/**"
+                        "/auth/token",      // ROPC login proxy — no token available yet
+                        "/auth/refresh",    // silent refresh — called before token attaches
+                        "/actuator/health"
                 ).permitAll()
-                // User service endpoints require USER or ADMIN role
+
+                // ── User service ──────────────────────────────────────────
                 .requestMatchers("/api/v1/users/**").hasAnyRole("USER", "ADMIN")
-                // Auth endpoints (user-service login/logout/me) require authentication
                 .requestMatchers("/api/v1/auth/**").authenticated()
-                // All other endpoints require authentication
+
+                // ── Future services: add path matchers here ───────────────
+                // .requestMatchers("/api/v1/orders/**").hasAnyRole("USER", "ADMIN")
+                // .requestMatchers("/api/v1/products/**").hasAnyRole("USER", "ADMIN")
+
                 .anyRequest().authenticated()
             )
-            // Use Keycloak JWT converter so realm_access.roles → ROLE_USER / ROLE_ADMIN
-            .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt ->
-                jwt.jwtAuthenticationConverter(KeycloakJwtConverter.create())))
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
-
-        // Add token propagation filter
-        http.addFilterAfter(tokenPropagationFilter, BasicAuthenticationFilter.class);
+            // Validate JWT with Keycloak JWKS; map realm_access.roles → ROLE_USER / ROLE_ADMIN
+            .oauth2ResourceServer(oauth2 ->
+                oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(KeycloakJwtConverter.create())));
 
         return http.build();
     }
 
-    /**
-     * CORS configuration
-     */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000", "http://localhost:4200"));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        configuration.setAllowedHeaders(Collections.singletonList("*"));
-        configuration.setExposedHeaders(Arrays.asList("Authorization", "X-Total-Count"));
-        configuration.setAllowCredentials(true);
-        configuration.setMaxAge(3600L);
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOrigins(Arrays.asList(
+                "http://localhost:5173",    // React / frontend apps
+                "http://localhost:2026"     // Swagger UI (user-service) — dev only
+        ));
+        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        config.setAllowedHeaders(Collections.singletonList("*"));
+        config.setExposedHeaders(Arrays.asList("Authorization", "X-Total-Count"));
+        config.setAllowCredentials(true);
+        config.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
+        source.registerCorsConfiguration("/**", config);
         return source;
     }
 }
-
