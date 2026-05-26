@@ -1,0 +1,219 @@
+# ==================================
+# DATABASES — MySQL + MongoDB
+#
+# MySQL  JDBC: jdbc:mysql://localhost:30036/user_db
+# MongoDB URL: mongodb://admin:admin123@localhost:30017/admin
+#
+# FIXES applied vs original:
+#  - MYSQL_DATABASE changed from 'testdb' → 'user_db'  (matches user-service application.properties)
+#  - Restored --default-authentication-plugin=mysql_native_password (correct flag for MySQL 8.0;
+#    --mysql-native-password=ON only exists in MySQL 8.4+)
+#  - Added PersistentVolumeClaims for MySQL and MongoDB (data no longer lost on restart)
+#  - Moved passwords into Kubernetes Secrets
+#  - Added namespace: ecommerce to all resources
+# ==================================
+
+# ── Namespace ────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ecommerce
+
+---
+# ==================================
+# MYSQL
+# ==================================
+
+# ── Secret ───────────────────────────────────────────────────────────────────
+# root-password = root123  (echo -n "root123" | base64)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysql-secret
+  namespace: ecommerce
+type: Opaque
+data:
+  root-password: cm9vdDEyMw==
+
+---
+# ── PersistentVolumeClaim ────────────────────────────────────────────────────
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc
+  namespace: ecommerce
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+
+---
+# ── Deployment ───────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: ecommerce
+  labels:
+    app: mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          args:
+            # mysql_native_password allows older JDBC drivers to connect without
+            # "Public Key Retrieval is not allowed" errors (MySQL 8.0 default is caching_sha2_password)
+            - --default-authentication-plugin=mysql_native_password
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: root-password
+            # IMPORTANT: must match spring.datasource.url in user-service application.properties
+            - name: MYSQL_DATABASE
+              value: user_db
+          ports:
+            - containerPort: 3306
+          volumeMounts:
+            - name: mysql-data
+              mountPath: /var/lib/mysql
+          readinessProbe:
+            exec:
+              # Simple ping — no password needed, avoids hardcoded credentials in probe
+              command: ["mysqladmin", "ping", "-h", "localhost"]
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+      volumes:
+        - name: mysql-data
+          persistentVolumeClaim:
+            claimName: mysql-pvc
+
+---
+# ── Service ───────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-service
+  namespace: ecommerce
+spec:
+  type: NodePort
+  selector:
+    app: mysql
+  ports:
+    - name: mysql
+      port: 3306
+      targetPort: 3306
+      nodePort: 30036   # access at localhost:30036
+
+---
+# ==================================
+# MONGODB
+# ==================================
+
+# ── Secret ───────────────────────────────────────────────────────────────────
+# root-password = admin123  (echo -n "admin123" | base64)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongodb-secret
+  namespace: ecommerce
+type: Opaque
+data:
+  root-password: YWRtaW4xMjM=
+
+---
+# ── PersistentVolumeClaim ────────────────────────────────────────────────────
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodb-pvc
+  namespace: ecommerce
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+
+---
+# ── Deployment ───────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb
+  namespace: ecommerce
+  labels:
+    app: mongodb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb
+  template:
+    metadata:
+      labels:
+        app: mongodb
+    spec:
+      containers:
+        - name: mongodb
+          image: mongo:7
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              value: admin
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-secret
+                  key: root-password
+          ports:
+            - containerPort: 27017
+          volumeMounts:
+            - name: mongodb-data
+              mountPath: /data/db
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+      volumes:
+        - name: mongodb-data
+          persistentVolumeClaim:
+            claimName: mongodb-pvc
+
+---
+# ── Service ───────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-service
+  namespace: ecommerce
+spec:
+  type: NodePort
+  selector:
+    app: mongodb
+  ports:
+    - name: mongodb
+      port: 27017
+      targetPort: 27017
+      nodePort: 30017   # access at localhost:30017
