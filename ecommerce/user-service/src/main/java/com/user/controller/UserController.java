@@ -1,23 +1,24 @@
 package com.user.controller;
 
-import com.user.mysql.entity.User;
-import com.user.service.UserService;
 import com.user.dto.UserDto;
+import com.user.entity.User;
 import com.user.mapper.UserMapper;
-import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.web.PageableDefault;
-import org.springframework.web.bind.annotation.*;
-import jakarta.validation.Valid;
-import org.springframework.http.ResponseEntity;
-import org.springframework.http.HttpStatus;
+import com.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -30,7 +31,8 @@ public class UserController {
 
     @Operation(summary = "Create a new user", description = "Creates a new user. ID and version should be null on request.")
     @ApiResponses({
-        @ApiResponse(responseCode = "201", description = "User created successfully", content = @Content(schema = @Schema(implementation = UserDto.class))),
+        @ApiResponse(responseCode = "201", description = "User created successfully",
+                     content = @Content(schema = @Schema(implementation = UserDto.class))),
         @ApiResponse(responseCode = "400", description = "Invalid request body (validation failed)"),
         @ApiResponse(responseCode = "500", description = "Internal server error")
     })
@@ -40,37 +42,50 @@ public class UserController {
         toCreate.setId(null);
         toCreate.setVersion(null);
         User created = userService.create(toCreate);
-        UserDto dto = userMapper.toDto(created);
-        return ResponseEntity.status(HttpStatus.CREATED).body(dto);
+        return ResponseEntity.status(HttpStatus.CREATED).body(userMapper.toDto(created));
     }
 
-    @Operation(summary = "Get all users with pagination", description = "Retrieves a paginated list of all users. Supports pagination and sorting.")
-    @ApiResponse(responseCode = "200", description = "List of users", content = @Content(schema = @Schema(implementation = Page.class)))
+    /**
+     * GET /api/v1/users?page=0&size=10&sort=name,asc
+     *
+     * Spring MVC auto-resolves {@link Pageable} from the query string via
+     * {@code PageableHandlerMethodArgumentResolver} (registered by Spring Data Web
+     * auto-configuration — no manual setup needed in servlet mode).
+     */
+    @Operation(summary = "Get all users with pagination",
+               description = "Retrieves a paginated list of users. Query params: page, size, sort.")
+    @ApiResponse(responseCode = "200", description = "Paginated list of users",
+                 content = @Content(schema = @Schema(implementation = Page.class)))
     @GetMapping
-    public Page<UserDto> getAll(@PageableDefault(size = 20) Pageable pageable) {
+    public Page<UserDto> getAll(
+            @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.ASC) Pageable pageable) {
         return userService.getAll(pageable).map(userMapper::toDto);
     }
 
-    @Operation(summary = "Get user by ID", description = "Retrieves a specific user by ID. Result is cached for 10 minutes.")
+    @Operation(summary = "Get user by ID",
+               description = "Retrieves a specific user by ID. Result is cached for 10 minutes.")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "User found", content = @Content(schema = @Schema(implementation = UserDto.class))),
+        @ApiResponse(responseCode = "200", description = "User found",
+                     content = @Content(schema = @Schema(implementation = UserDto.class))),
         @ApiResponse(responseCode = "404", description = "User not found")
     })
     @GetMapping("/{id}")
     public ResponseEntity<UserDto> getById(@PathVariable Long id) {
-        User user = userService.getById(id);
-        return ResponseEntity.ok(userMapper.toDto(user));
+        return ResponseEntity.ok(userMapper.toDto(userService.getById(id)));
     }
 
-    @Operation(summary = "Update an existing user", description = "Updates a user. Include the current version for optimistic locking. Returns 409 if version mismatch.")
+    @Operation(summary = "Update an existing user",
+               description = "Updates a user. Include the current version for optimistic locking. Returns 409 on version mismatch.")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "User updated successfully", content = @Content(schema = @Schema(implementation = UserDto.class))),
+        @ApiResponse(responseCode = "200", description = "User updated successfully",
+                     content = @Content(schema = @Schema(implementation = UserDto.class))),
         @ApiResponse(responseCode = "400", description = "Invalid request body"),
         @ApiResponse(responseCode = "404", description = "User not found"),
-        @ApiResponse(responseCode = "409", description = "Conflict - optimistic lock version mismatch")
+        @ApiResponse(responseCode = "409", description = "Conflict — optimistic lock version mismatch")
     })
     @PutMapping("/{id}")
-    public ResponseEntity<UserDto> update(@PathVariable Long id, @Valid @RequestBody UserDto userDto) {
+    public ResponseEntity<UserDto> update(@PathVariable Long id,
+                                          @Valid @RequestBody UserDto userDto) {
         User toUpdate = userMapper.toEntity(userDto);
         User updated = userService.update(id, toUpdate);
         return ResponseEntity.ok(userMapper.toDto(updated));
@@ -83,9 +98,7 @@ public class UserController {
     })
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
-
         userService.delete(id);
-
         return ResponseEntity.noContent().build();
     }
 }

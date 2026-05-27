@@ -4,37 +4,29 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
-import org.springframework.security.oauth2.server.resource.authentication.ReactiveJwtAuthenticationConverterAdapter;
 
 import java.util.*;
 
 /**
- * Keycloak JWT → Spring Security authority converter for User Service (Reactive/WebFlux).
+ * Keycloak JWT → Spring Security authority converter.
  *
  * Keycloak puts roles in:
- *  - realm_access.roles         → realm-level roles  (USER, ADMIN, …)
- *  - resource_access.<id>.roles → client-level roles
+ *  - realm_access.roles              → realm-level roles  (USER, ADMIN, …)
+ *  - resource_access.&lt;id&gt;.roles → client-level roles
  *
- * Spring Security's default reactive converter only reads 'scope'/'scp' claims.
- * This converter bridges Keycloak's role structure to Spring Security authorities.
+ * Spring Security's default converter only reads 'scope'/'scp' claims.
+ * This converter bridges Keycloak's role structure to Spring Security authorities
+ * (e.g. "ADMIN" → "ROLE_ADMIN").
  *
- * Usage (in reactive SecurityConfig):
+ * Usage (in MVC SecurityConfig):
  *   .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt ->
- *       jwt.jwtAuthenticationConverter(KeycloakJwtConverter.reactive())))
+ *       jwt.jwtAuthenticationConverter(KeycloakJwtConverter.blocking())))
  */
 public final class KeycloakJwtConverter {
 
     private KeycloakJwtConverter() {}
 
-    /**
-     * Returns a {@link ReactiveJwtAuthenticationConverterAdapter} that wraps the
-     * blocking {@link JwtAuthenticationConverter} for use in WebFlux security chains.
-     */
-    public static ReactiveJwtAuthenticationConverterAdapter reactive() {
-        return new ReactiveJwtAuthenticationConverterAdapter(blocking());
-    }
-
-    /** Blocking (servlet) variant — reuse when needed. */
+    /** Servlet/MVC converter — use in {@code HttpSecurity} OAuth2 resource-server config. */
     public static JwtAuthenticationConverter blocking() {
         JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
         converter.setJwtGrantedAuthoritiesConverter(KeycloakJwtConverter::extractAuthorities);
@@ -52,7 +44,7 @@ public final class KeycloakJwtConverter {
             List<String> roles = (List<String>) realmAccess.get("roles");
             if (roles != null) {
                 roles.forEach(role ->
-                    authorities.add(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase())));
+                        authorities.add(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase())));
             }
         }
 
@@ -64,7 +56,7 @@ public final class KeycloakJwtConverter {
                     List<String> clientRoles = (List<String>) clientMap.get("roles");
                     if (clientRoles != null) {
                         clientRoles.forEach(role ->
-                            authorities.add(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase())));
+                                authorities.add(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase())));
                     }
                 }
             });

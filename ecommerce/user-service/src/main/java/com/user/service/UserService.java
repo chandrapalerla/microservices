@@ -1,18 +1,16 @@
 package com.user.service;
 
-import com.user.mysql.entity.User;
-import com.user.mysql.repository.UserRepository;
+import com.user.entity.User;
+import com.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
-
-import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -30,13 +28,7 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = "users", key = "'all'")
-    public List<User> getAll() {
-        return userRepository.findAll();
-    }
-
-    @Transactional(readOnly = true)
-    @Cacheable(value = "usersPage", key = "T(java.util.Objects).hash(#pageable.pageNumber, #pageable.pageSize, #pageable.sort)")
+    @Cacheable(value = "usersPage", key = "#pageable")
     public Page<User> getAll(Pageable pageable) {
         return userRepository.findAll(pageable);
     }
@@ -44,8 +36,7 @@ public class UserService {
     @Transactional(readOnly = true)
     @Cacheable(value = "users", key = "#id")
     public User getById(Long id) {
-        return userRepository.findById(id)
-                .orElseThrow(() -> new com.user.exception.ResourceNotFoundException("User not found"));
+        return userRepository.findById(id).orElseThrow(() -> new com.user.exception.ResourceNotFoundException("User not found"));
     }
 
     @Transactional
@@ -63,8 +54,8 @@ public class UserService {
 
     @Transactional
     @Caching(evict = {
-        @CacheEvict(value = "users",     key = "#id"),
-        @CacheEvict(value = "usersPage", allEntries = true)   // invalidate all pages on delete
+            @CacheEvict(value = "users", key = "#id"),
+            @CacheEvict(value = "usersPage", allEntries = true)   // invalidate all pages on delete
     })
     public void delete(Long id) {
         userRepository.deleteById(id);

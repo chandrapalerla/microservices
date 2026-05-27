@@ -1,7 +1,7 @@
 package com.user.mapper;
 
 import com.user.dto.UserDto;
-import com.user.mysql.entity.User;
+import com.user.entity.User;
 import org.mapstruct.Mapper;
 
 @Mapper(componentModel = "spring")

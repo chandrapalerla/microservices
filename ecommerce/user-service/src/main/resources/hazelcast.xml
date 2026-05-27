@@ -5,6 +5,27 @@
                                http://www.hazelcast.com/schema/config/hazelcast-config-5.3.xsd">
     <instance-name>hazelcast-instance</instance-name>
 
+    <!--
+      Hazelcast 5 has a Java-serialization filter enabled by default for security.
+      Without whitelisting, it refuses to serialize any class via Java serialization,
+      causing HazelcastSerializationException on PageImpl / User cache puts.
+
+      Whitelisted prefixes:
+        com.user          — User entity and any future domain objects
+        org.springframework.data.domain — PageImpl, PageRequest, Sort, etc.
+        java.             — JDK types (ArrayList, LinkedHashMap, …)
+    -->
+    <serialization>
+        <java-serialization-filter defaults-disabled="false">
+            <whitelist>
+                <prefix>com.user</prefix>
+                <prefix>org.springframework.data.domain</prefix>
+                <prefix>java.</prefix>
+                <prefix>sun.reflect</prefix>
+            </whitelist>
+        </java-serialization-filter>
+    </serialization>
+
     <network>
         <port auto-increment="true">5701</port>
         <outbound-ports>

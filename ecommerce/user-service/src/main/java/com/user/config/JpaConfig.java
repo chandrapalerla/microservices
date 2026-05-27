@@ -10,7 +10,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
  * actually attempting to access repositories.
  */
 @Configuration
-@EnableJpaRepositories(basePackages = "com.user.mysql.repository")
+@EnableJpaRepositories(basePackages = "com.user.repository")
 public class JpaConfig {
     // JPA configuration - will allow lazy initialization of repositories
     // This prevents the app from crashing if MySQL is not available at startup

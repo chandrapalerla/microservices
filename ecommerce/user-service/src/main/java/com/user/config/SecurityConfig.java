@@ -1,22 +1,27 @@
 package com.user.config;
 
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
-import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
-import org.springframework.security.config.web.server.ServerHttpSecurity;
-import org.springframework.security.web.server.SecurityWebFilterChain;
-import org.springframework.web.server.ServerWebExchange;
-import org.springframework.web.server.WebFilter;
-import org.springframework.web.server.WebFilterChain;
-import reactor.core.publisher.Mono;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
 
 /**
  * Security for user-service — two layers of protection:
  *
- *  Layer 1 │ gatewaySecretFilter
+ *  Layer 1 │ GatewaySecretFilter
  *          │ Every /api/** request must carry X-Gateway-Secret (added by GatewayConfig).
  *          │ Direct calls from browsers/curl get 403 before touching any business logic.
  *
@@ -29,7 +34,7 @@ import reactor.core.publisher.Mono;
  * Server-to-server calls (gateway → this service) never trigger CORS preflight.
  */
 @Configuration
-@EnableWebFluxSecurity
+@EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true, securedEnabled = true, jsr250Enabled = true)
 public class SecurityConfig {
 
@@ -37,53 +42,68 @@ public class SecurityConfig {
     @Value("${gateway.internal-secret}")
     private String gatewaySecret;
 
-    /**
-     * Layer 1 — blocks direct access, passes gateway-forwarded requests through.
-     */
     @Bean
-    public WebFilter gatewaySecretFilter() {
-        return (ServerWebExchange exchange, WebFilterChain chain) -> {
-            String path = exchange.getRequest().getPath().value();
-
-            if (path.startsWith("/api/")) {
-                String incoming = exchange.getRequest()
-                        .getHeaders()
-                        .getFirst("X-Gateway-Secret");
-
-                if (!gatewaySecret.equals(incoming)) {
-                    exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
-                    return exchange.getResponse().setComplete();
-                }
-            }
-            return chain.filter(exchange);
-        };
-    }
-
-    /**
-     * Layer 2 — JWT validation + role-based access rules.
-     */
-    @Bean
-    public SecurityWebFilterChain securityFilterChain(ServerHttpSecurity http) {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(ServerHttpSecurity.CsrfSpec::disable)
-            .cors(ServerHttpSecurity.CorsSpec::disable)   // gateway owns CORS, not this service
-            .authorizeExchange(exchanges -> exchanges
-                // Swagger UI served directly — no token or gateway secret needed
-                .pathMatchers(
+            // Layer 1: block direct (non-gateway) calls to /api/**
+            .addFilterBefore(new GatewaySecretFilter(gatewaySecret),
+                             UsernamePasswordAuthenticationFilter.class)
+
+            .csrf(AbstractHttpConfigurer::disable)
+            .cors(AbstractHttpConfigurer::disable)   // gateway owns CORS
+            .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+            .authorizeHttpRequests(auth -> auth
+                // Swagger UI — no token or gateway secret needed
+                .requestMatchers(
                         "/swagger-ui/**",
+                        "/swagger-ui.html",
                         "/v3/api-docs/**"
                 ).permitAll()
 
                 // Business endpoints — roles enforced at gateway AND here (defence-in-depth)
-                .pathMatchers("/api/v1/users/**").hasAnyRole("USER", "ADMIN")
-                .pathMatchers("/api/v1/auth/**").authenticated()
+                .requestMatchers("/api/v1/users/**").hasAnyRole("USER", "ADMIN")
+                .requestMatchers("/api/v1/auth/**").authenticated()
 
-                .anyExchange().authenticated()
+                .anyRequest().authenticated()
             )
+
+            // Layer 2: JWT resource-server validation
             .oauth2ResourceServer(oauth2 ->
                     oauth2.jwt(jwt ->
-                        jwt.jwtAuthenticationConverter(KeycloakJwtConverter.reactive())));
+                            jwt.jwtAuthenticationConverter(KeycloakJwtConverter.blocking())));
 
         return http.build();
+    }
+
+    /**
+     * Servlet filter that enforces the shared gateway secret on /api/** requests.
+     * Defined as a private static class so it is NOT auto-registered as a servlet
+     * filter by Spring Boot — it is only active inside the security filter chain.
+     */
+    private static class GatewaySecretFilter extends OncePerRequestFilter {
+
+        private final String gatewaySecret;
+
+        GatewaySecretFilter(String gatewaySecret) {
+            this.gatewaySecret = gatewaySecret;
+        }
+
+        @Override
+        protected void doFilterInternal(HttpServletRequest request,
+                                        HttpServletResponse response,
+                                        FilterChain filterChain)
+                throws ServletException, IOException {
+
+            String path = request.getRequestURI();
+            if (path.startsWith("/api/")) {
+                String incoming = request.getHeader("X-Gateway-Secret");
+                if (!gatewaySecret.equals(incoming)) {
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    return;
+                }
+            }
+            filterChain.doFilter(request, response);
+        }
     }
 }
