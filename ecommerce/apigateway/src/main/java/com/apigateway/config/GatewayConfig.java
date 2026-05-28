@@ -62,17 +62,39 @@ public class GatewayConfig {
     }
 
     // ─────────────────────────────────────────────────────────────
-    // FUTURE: ORDER SERVICE
+    // ORDER SERVICE  (default: localhost:2029)
     // ─────────────────────────────────────────────────────────────
-    // @Value("${gateway.routes.order-service:http://localhost:2028}")
-    // private String orderServiceUrl;
-    //
-    // @Bean
-    // public RouterFunction<ServerResponse> orderServiceRoutes() {
-    //     return GatewayRouterFunctions.route("order-service")
-    //             .route(path("/api/v1/orders/**"),
-    //                     HandlerFunctions.http(orderServiceUrl))
-    //             .filter(FilterFunctions.addRequestHeader("X-Gateway-Secret", gatewaySecret))
-    //             .build();
-    // }
+    @Value("${gateway.routes.order-service:http://localhost:2029}")
+    private String orderServiceUrl;
+
+    @Bean
+    public RouterFunction<ServerResponse> orderServiceRoutes() {
+        return GatewayRouterFunctions.route("order-service")
+                .route(path("/api/v1/orders/**"),
+                        HandlerFunctions.http(orderServiceUrl))
+                .filter(FilterFunctions.addRequestHeader("X-Gateway-Secret", gatewaySecret))
+                .build();
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // PRODUCT SERVICE  (default: localhost:2028)
+    // ─────────────────────────────────────────────────────────────
+    @Value("${gateway.routes.product-service:http://localhost:2028}")
+    private String productServiceUrl;
+
+    @Bean
+    public RouterFunction<ServerResponse> productServiceRoutes() {
+        return GatewayRouterFunctions.route("product-service-products")
+                .route(path("/api/v1/products/**"),
+                        HandlerFunctions.http(productServiceUrl))
+                .filter(FilterFunctions.addRequestHeader("X-Gateway-Secret", gatewaySecret))
+                .build()
+                .and(
+                    GatewayRouterFunctions.route("product-service-categories")
+                        .route(path("/api/v1/categories/**"),
+                                HandlerFunctions.http(productServiceUrl))
+                        .filter(FilterFunctions.addRequestHeader("X-Gateway-Secret", gatewaySecret))
+                        .build()
+                );
+    }
 }

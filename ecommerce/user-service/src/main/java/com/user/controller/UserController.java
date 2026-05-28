@@ -2,7 +2,9 @@ package com.user.controller;
 
 import com.user.dto.UserDto;
 import com.user.entity.User;
+import com.user.exception.ResourceNotFoundException;
 import com.user.mapper.UserMapper;
+import com.user.repository.UserRepository;
 import com.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -18,6 +20,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -26,8 +30,33 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "User Management", description = "APIs for managing users stored in MySQL with caching and optimistic locking")
 public class UserController {
 
-    private final UserService userService;
-    private final UserMapper userMapper;
+    private final UserService    userService;
+    private final UserMapper     userMapper;
+    private final UserRepository userRepository;
+
+    // ── Current user profile ─────────────────────────────────────────────────
+
+    @Operation(summary = "Get the current user's own profile",
+               description = "Looks up the DB user record using the email claim from the JWT. " +
+                             "Accessible to any authenticated user (USER or ADMIN).")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Profile returned",
+                     content = @Content(schema = @Schema(implementation = UserDto.class))),
+        @ApiResponse(responseCode = "404", description = "No DB user matches the JWT email")
+    })
+    @GetMapping("/me")
+    public ResponseEntity<UserDto> getMe(@AuthenticationPrincipal Jwt jwt) {
+        String email = jwt.getClaimAsString("email");
+        if (email == null || email.isBlank()) {
+            // Fall back to preferred_username as email (some Keycloak configs omit email claim)
+            email = jwt.getClaimAsString("preferred_username");
+        }
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No user record found for the authenticated account. " +
+                        "Please ask an admin to create your profile."));
+        return ResponseEntity.ok(userMapper.toDto(user));
+    }
 
     @Operation(summary = "Create a new user", description = "Creates a new user. ID and version should be null on request.")
     @ApiResponses({

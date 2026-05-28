@@ -6,4 +6,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
+
+    /** Used by AuthenticationController to find the DB user record from the JWT email claim. */
+    java.util.Optional<User> findByEmail(String email);
 }

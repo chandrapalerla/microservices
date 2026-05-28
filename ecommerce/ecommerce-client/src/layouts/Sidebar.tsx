@@ -1,10 +1,8 @@
-/**
- * Responsive sidebar navigation.
- * - Desktop: fixed left-side panel.
- * - Mobile: slides in as an overlay when `mobileOpen` is true.
- */
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Users, ShieldCheck, X, Package } from 'lucide-react'
+import {
+  LayoutDashboard, Users, ShieldCheck, X, Package,
+  Tag, ShoppingBag, ClipboardList,
+} from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { ROLES, APP_NAME } from '@/constants'
 import { cn } from '@/utils/cn'
@@ -17,15 +15,33 @@ interface SidebarProps {
 const navItems = [
   {
     label: 'Dashboard',
-    path:  '/dashboard',
+    path:  '/admin/dashboard',
     icon:  LayoutDashboard,
-    roles: null,                   // accessible to everyone
+    roles: null,
+  },
+  {
+    label: 'Orders',
+    path:  '/admin/orders',
+    icon:  ClipboardList,
+    roles: [ROLES.ADMIN],
+  },
+  {
+    label: 'Products',
+    path:  '/admin/products',
+    icon:  ShoppingBag,
+    roles: [ROLES.ADMIN],
+  },
+  {
+    label: 'Categories',
+    path:  '/admin/categories',
+    icon:  Tag,
+    roles: [ROLES.ADMIN],
   },
   {
     label: 'Users',
-    path:  '/users',
+    path:  '/admin/users',
     icon:  Users,
-    roles: [ROLES.ADMIN],          // admin only
+    roles: [ROLES.ADMIN],
   },
 ]
 
@@ -71,7 +87,10 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
           <div className="rounded-lg bg-indigo-600 p-1.5">
             <Package size={18} className="text-white" />
           </div>
-          <span className="font-bold text-gray-900 dark:text-gray-100">{APP_NAME}</span>
+          <div>
+            <span className="font-bold text-gray-900 dark:text-gray-100">{APP_NAME}</span>
+            <p className="text-xs text-gray-400">Admin Panel</p>
+          </div>
         </div>
         {onClose && (
           <button
@@ -86,7 +105,6 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
         {navItems.map((item) => {
-          // Skip items that require a role the user doesn't have
           if (item.roles && !item.roles.some((r) => hasRole(r))) return null
           return (
             <NavItem
@@ -100,7 +118,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
         })}
       </nav>
 
-      {/* Footer hint for admins */}
+      {/* Footer */}
       {hasRole(ROLES.ADMIN) && (
         <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-3">
           <div className="flex items-center gap-2 text-xs text-purple-600 dark:text-purple-400">
@@ -116,20 +134,13 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
 export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   return (
     <>
-      {/* Desktop sidebar */}
       <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 lg:z-20 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700">
         <SidebarContent />
       </aside>
 
-      {/* Mobile overlay */}
       {mobileOpen && (
         <>
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 z-30 bg-black/50 lg:hidden"
-            onClick={onClose}
-          />
-          {/* Drawer */}
+          <div className="fixed inset-0 z-30 bg-black/50 lg:hidden" onClick={onClose} />
           <aside className="fixed inset-y-0 left-0 z-40 w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 lg:hidden">
             <SidebarContent onClose={onClose} />
           </aside>

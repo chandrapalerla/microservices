@@ -48,3 +48,25 @@ gateway:
   # (e.g. http://user-service.default.svc.cluster.local:2026).
   routes:
     user-service: http://localhost:2026
+    order-service: http://localhost:2029
+    product-service: http://localhost:2028
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,metrics,info
+  endpoint:
+    prometheus:
+      enabled: true
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      endpoint: http://localhost:30418/v1/traces

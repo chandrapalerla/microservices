@@ -37,16 +37,24 @@ public class SecurityConfig {
                         "/auth/health",
                         "/auth/token",      // ROPC login proxy — no token available yet
                         "/auth/refresh",    // silent refresh — called before token attaches
-                        "/actuator/health"
+                        "/actuator/**"      // Prometheus scraping + health checks
                 ).permitAll()
 
                 // ── User service ──────────────────────────────────────────
                 .requestMatchers("/api/v1/users/**").hasAnyRole("USER", "ADMIN")
                 .requestMatchers("/api/v1/auth/**").authenticated()
 
+                // ── Order service ─────────────────────────────────────────
+                .requestMatchers("/api/v1/orders/**").hasAnyRole("USER", "ADMIN")
+
+                // ── Product service ───────────────────────────────────────
+                // Public catalogue reads are open; writes require ADMIN (enforced in product-service)
+                .requestMatchers("GET", "/api/v1/products/**").permitAll()
+                .requestMatchers("GET", "/api/v1/categories/**").permitAll()
+                .requestMatchers("/api/v1/products/**").hasAnyRole("USER", "ADMIN")
+                .requestMatchers("/api/v1/categories/**").hasRole("ADMIN")
+
                 // ── Future services: add path matchers here ───────────────
-                // .requestMatchers("/api/v1/orders/**").hasAnyRole("USER", "ADMIN")
-                // .requestMatchers("/api/v1/products/**").hasAnyRole("USER", "ADMIN")
 
                 .anyRequest().authenticated()
             )

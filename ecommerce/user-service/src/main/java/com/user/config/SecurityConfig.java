@@ -61,6 +61,9 @@ public class SecurityConfig {
                         "/v3/api-docs/**"
                 ).permitAll()
 
+                // Actuator — open for Prometheus scraping (no auth needed from within K8s)
+                .requestMatchers("/actuator/**").permitAll()
+
                 // Business endpoints — roles enforced at gateway AND here (defence-in-depth)
                 .requestMatchers("/api/v1/users/**").hasAnyRole("USER", "ADMIN")
                 .requestMatchers("/api/v1/auth/**").authenticated()

@@ -24,7 +24,13 @@ export async function getUserById(id: number): Promise<User> {
   return data
 }
 
-/** Fetches the currently authenticated user's info from user-service. */
+/** Returns the authenticated user's own DB profile (id, name, email, role, status). */
+export async function getMyProfile(): Promise<User> {
+  const { data } = await api.get<User>(`${BASE}/me`)
+  return data
+}
+
+/** Fetches the currently authenticated user's JWT claims from user-service. */
 export async function getCurrentUser(): Promise<Record<string, unknown>> {
   const { data } = await api.get('/v1/auth/me')
   return data
