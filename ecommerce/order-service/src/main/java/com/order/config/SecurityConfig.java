@@ -66,6 +66,9 @@ public class SecurityConfig {
                 // Order endpoints — roles also enforced at gateway (defence-in-depth)
                 .requestMatchers("/api/v1/orders/**").hasAnyRole("USER", "ADMIN")
 
+                // Coupon endpoints — ADMIN-only write/list enforced at method level via @PreAuthorize
+                .requestMatchers("/api/v1/coupons/**").hasAnyRole("USER", "ADMIN")
+
                 .anyRequest().authenticated()
             )
 

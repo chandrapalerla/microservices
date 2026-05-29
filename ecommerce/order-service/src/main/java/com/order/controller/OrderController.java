@@ -159,10 +159,11 @@ public class OrderController {
     @PostMapping
     @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     public ResponseEntity<OrderResponse> placeOrder(
+            @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody OrderRequest request,
             Authentication authentication) {
         String placedBy = authentication.getName();
-        OrderResponse created = orderService.create(request, placedBy);
+        OrderResponse created = orderService.create(request, placedBy, idempotencyKey);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 

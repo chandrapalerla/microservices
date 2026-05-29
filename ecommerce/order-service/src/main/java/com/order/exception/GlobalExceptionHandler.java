@@ -117,6 +117,17 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(problem);
     }
 
+    // ── 400 Bad Request — coupon validation failures ──────────────────────────
+    @ExceptionHandler(CouponException.class)
+    public ResponseEntity<ProblemDetail> handleCoupon(CouponException ex) {
+        log.warn("Coupon validation failed: {}", ex.getMessage());
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        problem.setTitle("Coupon Error");
+        problem.setType(URI.create("https://api.ecommerce.example.com/errors/coupon"));
+        problem.setProperty("timestamp", Instant.now());
+        return ResponseEntity.badRequest().body(problem);
+    }
+
     // ── 502 Bad Gateway — Feign client errors (downstream service error) ───────
     @ExceptionHandler(FeignException.class)
     public ResponseEntity<ProblemDetail> handleFeignException(FeignException ex) {

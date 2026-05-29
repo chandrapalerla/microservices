@@ -1,8 +1,11 @@
 package com.order.kafka;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.order.entity.DeadLetterEvent;
 import com.order.entity.Order;
 import com.order.entity.OrderItem;
 import com.order.kafka.event.OrderEvent;
+import com.order.repository.DeadLetterEventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -17,12 +20,12 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Publishes OrderEvents to the "order-events" Kafka topic.
  *
- * Key   = orderId.toString() — guarantees that all events for the same order
- *         land in the same partition, preserving chronological ordering.
+ * Key = orderId — guarantees ordering within a single order's events.
  *
- * Failures are logged but NOT re-thrown.  The order state has already been
- * persisted to the database when this is called; a Kafka failure should not
- * roll back the DB transaction.  Consumers can replay from the DB if needed.
+ * On publish failure the event is persisted to dead_letter_events so it is
+ * never silently lost. Ops can inspect and replay DLQ records after broker recovery.
+ * DLQ save runs in its own transaction (Spring Data's default) on the Kafka
+ * callback thread — completely decoupled from the caller's DB transaction.
  */
 @Component
 @RequiredArgsConstructor
@@ -32,6 +35,8 @@ public class OrderEventPublisher {
     private static final String TOPIC = "order-events";
 
     private final KafkaTemplate<String, OrderEvent> kafkaTemplate;
+    private final DeadLetterEventRepository         deadLetterEventRepository;
+    private final ObjectMapper                      objectMapper;
 
     public void publish(Order order, String eventType) {
         publish(order, eventType, null);
@@ -57,8 +62,8 @@ public class OrderEventPublisher {
 
         future.whenComplete((result, ex) -> {
             if (ex != null) {
-                log.error("Failed to publish {} event for order {}: {}",
-                        eventType, order.getId(), ex.getMessage());
+                log.error("Failed to publish {} event for order {}: {}", eventType, order.getId(), ex.getMessage());
+                saveToDlq(event, ex.getMessage());
             } else {
                 log.debug("Published {} event for order {} to partition {} offset {}",
                         eventType, order.getId(),
@@ -66,6 +71,28 @@ public class OrderEventPublisher {
                         result.getRecordMetadata().offset());
             }
         });
+    }
+
+    private void saveToDlq(OrderEvent event, String errorMessage) {
+        try {
+            String payload = objectMapper.writeValueAsString(event);
+            DeadLetterEvent dlq = DeadLetterEvent.builder()
+                    .eventId(event.getEventId())
+                    .eventType(event.getEventType())
+                    .orderId(event.getOrderId())
+                    .payload(payload)
+                    .errorMessage(truncate(errorMessage, 500))
+                    .build();
+            deadLetterEventRepository.save(dlq);
+            log.warn("Saved failed event {} to DLQ", event.getEventId());
+        } catch (Exception saveEx) {
+            log.error("Could not save event {} to DLQ: {}", event.getEventId(), saveEx.getMessage());
+        }
+    }
+
+    private String truncate(String s, int max) {
+        if (s == null) return null;
+        return s.length() <= max ? s : s.substring(0, max);
     }
 
     private List<OrderEvent.OrderEventItem> mapItems(List<OrderItem> items) {

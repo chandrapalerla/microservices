@@ -13,19 +13,26 @@ import com.order.dto.request.StatusUpdateRequest;
 import com.order.dto.response.OrderItemResponse;
 import com.order.dto.response.OrderResponse;
 import com.order.dto.response.OrderStatusHistoryResponse;
+import com.order.entity.IdempotencyKey;
 import com.order.entity.Order;
 import com.order.entity.OrderItem;
 import com.order.entity.OrderStatusHistory;
+import com.order.entity.OutboxEvent;
+import com.order.entity.PendingStockRestore;
+import com.order.enums.CompensationStatus;
 import com.order.enums.OrderStatus;
+import com.order.enums.OutboxStatus;
 import com.order.enums.PaymentStatus;
 import com.order.exception.InsufficientStockException;
 import com.order.exception.InvalidOrderTransitionException;
 import com.order.exception.ResourceNotFoundException;
-import com.order.kafka.OrderEventPublisher;
 import com.order.mapper.OrderMapper;
 import com.order.observability.OrderMetrics;
+import com.order.repository.IdempotencyKeyRepository;
 import com.order.repository.OrderRepository;
 import com.order.repository.OrderStatusHistoryRepository;
+import com.order.repository.OutboxEventRepository;
+import com.order.repository.PendingStockRestoreRepository;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
@@ -53,14 +60,15 @@ import java.util.*;
  * Key responsibilities:
  *  - Enforce the order state machine (VALID_TRANSITIONS map)
  *  - Orchestrate Feign calls to user-service and product-service
- *  - Calculate pricing (subtotal, tax @ 18%, shipping, discount)
+ *  - Calculate pricing (subtotal, tax @ 18%, shipping, discount via coupon)
  *  - Manage Hazelcast cache (@Cacheable / @CacheEvict)
- *  - Publish OrderEvents to Kafka on every status transition
+ *  - Write outbox records (same transaction) instead of publishing Kafka events directly
+ *  - Idempotency: honour X-Idempotency-Key to deduplicate duplicate POSTs
+ *  - Saga compensation: save PendingStockRestore when circuit breaker fires on restoreStock
  *
  * Resilience4j:
  *  - fetchUser() / fetchProduct() — wrapped with @CircuitBreaker + @Retry
  *  - Self-injection via @Lazy to allow AOP proxying of these methods
- *    (Spring AOP only intercepts calls through the proxy, not 'this.method()').
  */
 @Service
 @RequiredArgsConstructor
@@ -86,22 +94,24 @@ public class OrderService {
         VALID_TRANSITIONS = Collections.unmodifiableMap(map);
     }
 
-    private static final BigDecimal TAX_RATE          = new BigDecimal("0.18");
-    private static final BigDecimal SHIPPING_FEE       = new BigDecimal("50.00");
+    private static final BigDecimal TAX_RATE           = new BigDecimal("0.18");
+    private static final BigDecimal SHIPPING_FEE        = new BigDecimal("50.00");
     private static final BigDecimal FREE_SHIPPING_ABOVE = new BigDecimal("500.00");
 
     private final OrderRepository               orderRepository;
     private final OrderStatusHistoryRepository  historyRepository;
+    private final OutboxEventRepository         outboxEventRepository;
+    private final IdempotencyKeyRepository      idempotencyKeyRepository;
+    private final PendingStockRestoreRepository pendingStockRestoreRepository;
     private final OrderMapper                   orderMapper;
     private final UserServiceClient             userServiceClient;
     private final ProductServiceClient          productServiceClient;
-    private final OrderEventPublisher           eventPublisher;
     private final OrderMetrics                  orderMetrics;
+    private final CouponService                 couponService;
 
     /**
      * Self-reference injected lazily so Spring can apply AOP proxies for
      * @CircuitBreaker / @Retry on fetchUser() and fetchProduct().
-     * Without this, calls to self.fetchUser() bypass the proxy.
      */
     @Autowired
     @Lazy
@@ -147,7 +157,7 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public List<OrderStatusHistoryResponse> getHistory(Long id) {
-        findOrderById(id); // verify order exists
+        findOrderById(id);
         return historyRepository.findByOrderIdOrderByChangedAtAsc(id)
                 .stream().map(orderMapper::toHistoryResponse).toList();
     }
@@ -156,9 +166,29 @@ public class OrderService {
     // PLACE ORDER
     // ═══════════════════════════════════════════════════════════════════════════
 
+    /**
+     * Creates a new order.
+     *
+     * Idempotency: if idempotencyKey is non-null and was already used, the original
+     * order is returned immediately without any side effects.
+     *
+     * Outbox: instead of publishing to Kafka directly, an outbox record is saved in
+     * the same DB transaction. OutboxPoller relays it to Kafka asynchronously,
+     * guaranteeing at-least-once delivery even when the broker is temporarily down.
+     */
     @Transactional
     @CacheEvict(value = "ordersPage", allEntries = true)
-    public OrderResponse create(OrderRequest request, String placedBy) {
+    public OrderResponse create(OrderRequest request, String placedBy, String idempotencyKey) {
+        // ── Idempotency check ────────────────────────────────────────────────
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            Optional<IdempotencyKey> existing = idempotencyKeyRepository.findByIdempotencyKey(idempotencyKey);
+            if (existing.isPresent()) {
+                log.info("Duplicate request detected for idempotency key '{}', returning existing order {}",
+                        idempotencyKey, existing.get().getOrderId());
+                return getById(existing.get().getOrderId());
+            }
+        }
+
         log.info("Placing order for userId={} by={}", request.getUserId(), placedBy);
 
         // 1. Validate user and get email via user-service
@@ -186,16 +216,22 @@ public class OrderService {
         BigDecimal taxAmount      = subtotal.multiply(TAX_RATE).setScale(2, RoundingMode.HALF_UP);
         BigDecimal shippingAmount = subtotal.compareTo(FREE_SHIPPING_ABOVE) > 0
                 ? BigDecimal.ZERO : SHIPPING_FEE;
-        BigDecimal discountAmount = BigDecimal.ZERO; // future: apply coupon logic
-        BigDecimal totalAmount    = subtotal.add(taxAmount).add(shippingAmount).subtract(discountAmount)
+
+        // 4. Apply coupon discount (if provided)
+        BigDecimal discountAmount = BigDecimal.ZERO;
+        if (request.getCouponCode() != null && !request.getCouponCode().isBlank()) {
+            discountAmount = couponService.validateAndApply(request.getCouponCode(), subtotal);
+        }
+
+        BigDecimal totalAmount = subtotal.add(taxAmount).add(shippingAmount).subtract(discountAmount)
                 .setScale(2, RoundingMode.HALF_UP);
 
-        // 4. Deduct stock for each item
+        // 5. Deduct stock for each item
         for (ResolvedItem ri : resolvedItems) {
             self.deductProductStock(ri.product.getId(), ri.quantity);
         }
 
-        // 5. Build Order with a temporary order number (replaced after ID is generated)
+        // 6. Build Order with a temporary order number (replaced after ID is generated)
         OrderRequest.ShippingAddressRequest addr = request.getShippingAddress();
         Order order = Order.builder()
                 .orderNumber("TMP-" + UUID.randomUUID())
@@ -221,7 +257,6 @@ public class OrderService {
                 .items(new ArrayList<>())
                 .build();
 
-        // Associate items before saving (cascade ALL will persist them)
         for (ResolvedItem ri : resolvedItems) {
             BigDecimal itemTotal = ri.product.getPrice()
                     .multiply(BigDecimal.valueOf(ri.quantity))
@@ -238,18 +273,24 @@ public class OrderService {
             order.getItems().add(item);
         }
 
-        // First save — generates the database ID
         Order saved = orderRepository.saveAndFlush(order);
 
-        // 6. Replace temp order number with readable sequential number
+        // 7. Replace temp order number with readable sequential number
         saved.setOrderNumber("ORD-" + Year.now().getValue() + "-" + String.format("%05d", saved.getId()));
         saved = orderRepository.saveAndFlush(saved);
 
-        // Append first status history entry
         appendHistory(saved, null, OrderStatus.PENDING, "Order placed", placedBy);
 
-        // 7. Publish ORDER_CREATED event
-        eventPublisher.publish(saved, "ORDER_CREATED");
+        // 8. Outbox — write event in same transaction instead of publishing directly
+        saveToOutbox(saved.getId(), "ORDER_CREATED", null);
+
+        // 9. Store idempotency key so duplicate requests return this order
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            idempotencyKeyRepository.save(IdempotencyKey.builder()
+                    .idempotencyKey(idempotencyKey)
+                    .orderId(saved.getId())
+                    .build());
+        }
 
         orderMetrics.incrementCreated();
         orderMetrics.recordAmount(saved.getTotalAmount().doubleValue());
@@ -269,7 +310,7 @@ public class OrderService {
     })
     public OrderResponse confirmPayment(Long id, PaymentConfirmRequest req, String changedBy) {
         Order order = findOrderById(id);
-        OrderStatus from = order.getStatus(); // PENDING or PAYMENT_FAILED are both valid sources
+        OrderStatus from = order.getStatus();
         validateTransition(order, OrderStatus.CONFIRMED);
 
         order.setStatus(OrderStatus.CONFIRMED);
@@ -279,7 +320,7 @@ public class OrderService {
 
         Order saved = orderRepository.saveAndFlush(order);
         appendHistory(saved, from, OrderStatus.CONFIRMED, req.getNotes(), changedBy);
-        eventPublisher.publish(saved, "ORDER_CONFIRMED");
+        saveToOutbox(saved.getId(), "ORDER_CONFIRMED", null);
         orderMetrics.recordTransition(from.name(), OrderStatus.CONFIRMED.name());
         return orderMapper.toResponse(saved);
     }
@@ -296,7 +337,7 @@ public class OrderService {
         order.setStatus(OrderStatus.PROCESSING);
         Order saved = orderRepository.saveAndFlush(order);
         appendHistory(saved, OrderStatus.CONFIRMED, OrderStatus.PROCESSING, req.getReason(), changedBy);
-        eventPublisher.publish(saved, "ORDER_PROCESSING");
+        saveToOutbox(saved.getId(), "ORDER_PROCESSING", null);
         orderMetrics.recordTransition(OrderStatus.CONFIRMED.name(), OrderStatus.PROCESSING.name());
         return orderMapper.toResponse(saved);
     }
@@ -317,7 +358,7 @@ public class OrderService {
 
         Order saved = orderRepository.saveAndFlush(order);
         appendHistory(saved, OrderStatus.PROCESSING, OrderStatus.SHIPPED, req.getNotes(), changedBy);
-        eventPublisher.publish(saved, "ORDER_SHIPPED");
+        saveToOutbox(saved.getId(), "ORDER_SHIPPED", null);
         orderMetrics.recordTransition(OrderStatus.PROCESSING.name(), OrderStatus.SHIPPED.name());
         return orderMapper.toResponse(saved);
     }
@@ -334,7 +375,7 @@ public class OrderService {
         order.setStatus(OrderStatus.OUT_FOR_DELIVERY);
         Order saved = orderRepository.saveAndFlush(order);
         appendHistory(saved, OrderStatus.SHIPPED, OrderStatus.OUT_FOR_DELIVERY, req.getReason(), changedBy);
-        eventPublisher.publish(saved, "ORDER_OUT_FOR_DELIVERY");
+        saveToOutbox(saved.getId(), "ORDER_OUT_FOR_DELIVERY", null);
         orderMetrics.recordTransition(OrderStatus.SHIPPED.name(), OrderStatus.OUT_FOR_DELIVERY.name());
         return orderMapper.toResponse(saved);
     }
@@ -346,7 +387,7 @@ public class OrderService {
     })
     public OrderResponse deliverOrder(Long id, StatusUpdateRequest req, String changedBy) {
         Order order = findOrderById(id);
-        OrderStatus from = order.getStatus(); // SHIPPED or OUT_FOR_DELIVERY are both valid sources
+        OrderStatus from = order.getStatus();
         validateTransition(order, OrderStatus.DELIVERED);
 
         order.setStatus(OrderStatus.DELIVERED);
@@ -354,7 +395,7 @@ public class OrderService {
 
         Order saved = orderRepository.saveAndFlush(order);
         appendHistory(saved, from, OrderStatus.DELIVERED, req.getReason(), changedBy);
-        eventPublisher.publish(saved, "ORDER_DELIVERED");
+        saveToOutbox(saved.getId(), "ORDER_DELIVERED", null);
         orderMetrics.recordTransition(from.name(), OrderStatus.DELIVERED.name());
         return orderMapper.toResponse(saved);
     }
@@ -368,23 +409,16 @@ public class OrderService {
         Order order = findOrderById(id);
         OrderStatus from = order.getStatus();
 
-        // PROCESSING → CANCEL requires ADMIN role
         if (from == OrderStatus.PROCESSING && !isAdmin) {
             throw new AccessDeniedException("Only admins can cancel orders in PROCESSING state");
         }
 
         validateTransition(order, OrderStatus.CANCELLED);
 
-        // Restore stock if it was already deducted (CONFIRMED or PROCESSING)
+        // Saga compensation: restore stock for items whose stock was already deducted
         if (from == OrderStatus.CONFIRMED || from == OrderStatus.PROCESSING) {
             for (OrderItem item : order.getItems()) {
-                try {
-                    self.restoreProductStock(item.getProductId(), item.getQuantity());
-                } catch (Exception e) {
-                    log.error("Failed to restore stock for product {} on order {} cancel: {}",
-                            item.getProductId(), id, e.getMessage());
-                    // Do not roll back the cancellation — stock can be reconciled later
-                }
+                self.restoreProductStock(id, item.getProductId(), item.getQuantity());
             }
         }
 
@@ -393,7 +427,7 @@ public class OrderService {
 
         Order saved = orderRepository.saveAndFlush(order);
         appendHistory(saved, from, OrderStatus.CANCELLED, req.getReason(), changedBy);
-        eventPublisher.publish(saved, "ORDER_CANCELLED", req.getReason());
+        saveToOutbox(saved.getId(), "ORDER_CANCELLED", req.getReason());
         orderMetrics.incrementCancelled();
         orderMetrics.recordTransition(from.name(), OrderStatus.CANCELLED.name());
         return orderMapper.toResponse(saved);
@@ -411,11 +445,10 @@ public class OrderService {
         order.setStatus(OrderStatus.RETURN_REQUESTED);
         Order saved = orderRepository.saveAndFlush(order);
         appendHistory(saved, OrderStatus.DELIVERED, OrderStatus.RETURN_REQUESTED, req.getReason(), changedBy);
-        eventPublisher.publish(saved, "ORDER_RETURN_REQUESTED", req.getReason());
+        saveToOutbox(saved.getId(), "ORDER_RETURN_REQUESTED", req.getReason());
         return orderMapper.toResponse(saved);
     }
 
-    /** Generic admin transition — validates against the state machine. */
     @Transactional
     @Caching(evict = {
         @CacheEvict(value = "orders",     key = "#id"),
@@ -431,7 +464,7 @@ public class OrderService {
 
         Order saved = orderRepository.saveAndFlush(order);
         appendHistory(saved, from, newStatus, req.getReason(), changedBy);
-        eventPublisher.publish(saved, "ORDER_" + newStatus.name(), req.getReason());
+        saveToOutbox(saved.getId(), "ORDER_" + newStatus.name(), req.getReason());
         return orderMapper.toResponse(saved);
     }
 
@@ -447,7 +480,7 @@ public class OrderService {
 
     public UserDto fetchUserFallback(Long userId, Exception ex) {
         log.error("user-service unavailable while fetching userId={}: {}", userId, ex.getMessage());
-        throw new com.order.exception.ResourceNotFoundException(
+        throw new ResourceNotFoundException(
                 "user-service is unavailable. Cannot validate user " + userId + ". Please retry.");
     }
 
@@ -459,7 +492,7 @@ public class OrderService {
 
     public ProductDto fetchProductFallback(Long productId, Exception ex) {
         log.error("product-service unavailable while fetching productId={}: {}", productId, ex.getMessage());
-        throw new com.order.exception.ResourceNotFoundException(
+        throw new ResourceNotFoundException(
                 "product-service is unavailable. Cannot validate product " + productId + ". Please retry.");
     }
 
@@ -475,16 +508,28 @@ public class OrderService {
                 "product-service is unavailable. Cannot deduct stock for product " + productId + ". Please retry.");
     }
 
+    /**
+     * Restores stock after cancellation. When the circuit breaker opens (product-service down),
+     * the fallback writes a PendingStockRestore record so StockCompensationScheduler can retry.
+     * The orderId parameter is passed so the compensation record is fully traceable.
+     */
     @CircuitBreaker(name = "product-service", fallbackMethod = "restoreStockFallback")
     @Retry(name = "product-service")
-    public void restoreProductStock(Long productId, Integer quantity) {
+    public void restoreProductStock(Long orderId, Long productId, Integer quantity) {
         productServiceClient.restoreStock(productId, new StockRequest(quantity));
     }
 
-    public void restoreStockFallback(Long productId, Integer quantity, Exception ex) {
-        // Non-fatal fallback — cancellation proceeds; stock reconciliation done offline
-        log.warn("product-service unavailable during stock restore for productId={}. " +
-                 "Stock will require manual reconciliation. Error: {}", productId, ex.getMessage());
+    public void restoreStockFallback(Long orderId, Long productId, Integer quantity, Exception ex) {
+        log.warn("product-service unavailable during stock restore for productId={} orderId={}. " +
+                 "Saving compensation record for retry. Error: {}", productId, orderId, ex.getMessage());
+        pendingStockRestoreRepository.save(PendingStockRestore.builder()
+                .orderId(orderId)
+                .productId(productId)
+                .quantity(quantity)
+                .reason("Circuit breaker open: " + truncate(ex.getMessage(), 200))
+                .status(CompensationStatus.PENDING)
+                .retryCount(0)
+                .build());
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -514,6 +559,17 @@ public class OrderService {
         historyRepository.save(entry);
     }
 
+    /** Writes an outbox record in the caller's transaction — relayed to Kafka by OutboxPoller. */
+    private void saveToOutbox(Long orderId, String eventType, String reason) {
+        outboxEventRepository.save(OutboxEvent.builder()
+                .orderId(orderId)
+                .eventType(eventType)
+                .reason(reason)
+                .status(OutboxStatus.PENDING)
+                .retryCount(0)
+                .build());
+    }
+
     private void setTimestampForStatus(Order order, OrderStatus status) {
         LocalDateTime now = LocalDateTime.now();
         switch (status) {
@@ -525,6 +581,10 @@ public class OrderService {
         }
     }
 
-    /** Internal record to pair a resolved product with its requested quantity. */
+    private String truncate(String s, int max) {
+        if (s == null) return null;
+        return s.length() <= max ? s : s.substring(0, max);
+    }
+
     private record ResolvedItem(ProductDto product, int quantity) {}
 }
