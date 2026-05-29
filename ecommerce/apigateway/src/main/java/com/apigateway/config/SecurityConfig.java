@@ -37,7 +37,8 @@ public class SecurityConfig {
                         "/auth/health",
                         "/auth/token",      // ROPC login proxy — no token available yet
                         "/auth/refresh",    // silent refresh — called before token attaches
-                        "/actuator/**"      // Prometheus scraping + health checks
+                        "/actuator/**",     // Prometheus scraping + health checks
+                        "/fallback/**"      // circuit breaker fallback — servlet FORWARD dispatch
                 ).permitAll()
 
                 // ── User service ──────────────────────────────────────────
@@ -74,7 +75,9 @@ public class SecurityConfig {
         ));
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         config.setAllowedHeaders(Collections.singletonList("*"));
-        config.setExposedHeaders(Arrays.asList("Authorization", "X-Total-Count"));
+        config.setExposedHeaders(Arrays.asList(
+                "Authorization", "X-Total-Count",
+                "X-RateLimit-Limit", "Retry-After"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);
 

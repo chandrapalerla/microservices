@@ -33,6 +33,12 @@
     <neverBlock>true</neverBlock>
   </appender>
 
+  <!-- Audit trail — one structured JSON event per inbound request -->
+  <logger name="AUDIT" level="INFO" additivity="false">
+    <appender-ref ref="JSON_CONSOLE"/>
+    <appender-ref ref="ASYNC_LOGSTASH"/>
+  </logger>
+
   <logger name="org.springframework.security" level="WARN"/>
   <logger name="org.springframework.cloud.gateway" level="INFO"/>
 
