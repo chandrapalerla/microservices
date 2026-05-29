@@ -101,6 +101,14 @@ public class GlobalExceptionHandler {
         return body(HttpStatus.BAD_REQUEST, "Bad Request", "Validation failed", errors);
     }
 
+    // ─── 502 Bad Gateway — external service (e.g. Keycloak Admin API) failed ──
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Object> handleIllegalState(IllegalStateException ex) {
+        return body(HttpStatus.BAD_GATEWAY, "Bad Gateway",
+                "An external service call failed. Please try again later.", null);
+    }
+
     // ─── 500 Catch-all ────────────────────────────────────────────────────────
 
     @ExceptionHandler(Exception.class)

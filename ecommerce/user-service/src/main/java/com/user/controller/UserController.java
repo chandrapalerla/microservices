@@ -2,6 +2,7 @@ package com.user.controller;
 
 import com.user.dto.UserDto;
 import com.user.entity.User;
+import com.user.enums.UserStatus;
 import com.user.exception.ResourceNotFoundException;
 import com.user.mapper.UserMapper;
 import com.user.repository.UserRepository;
@@ -20,6 +21,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -118,6 +120,40 @@ public class UserController {
         User toUpdate = userMapper.toEntity(userDto);
         User updated = userService.update(id, toUpdate);
         return ResponseEntity.ok(userMapper.toDto(updated));
+    }
+
+    @Operation(summary = "Change a user's status",
+               description = "ADMIN only. Sets the account status to ACTIVE, INACTIVE, or SUSPENDED " +
+                             "without requiring the full user payload. Publishes USER_DEACTIVATED for " +
+                             "INACTIVE/SUSPENDED transitions.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Status updated",
+                     content = @Content(schema = @Schema(implementation = UserDto.class))),
+        @ApiResponse(responseCode = "403", description = "Caller is not ADMIN"),
+        @ApiResponse(responseCode = "404", description = "User not found")
+    })
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<UserDto> updateStatus(@PathVariable Long id,
+                                                @RequestParam UserStatus status) {
+        return ResponseEntity.ok(userMapper.toDto(userService.updateStatus(id, status)));
+    }
+
+    @Operation(summary = "Revoke all active sessions for a user",
+               description = "ADMIN only. Calls the Keycloak Admin API to log out the user from all " +
+                             "devices immediately. Requires the 'manage-users' service-account role on " +
+                             "'user-service-client' in Keycloak realm-management.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "204", description = "Sessions revoked"),
+        @ApiResponse(responseCode = "403", description = "Caller is not ADMIN"),
+        @ApiResponse(responseCode = "404", description = "User not found"),
+        @ApiResponse(responseCode = "500", description = "Keycloak Admin API unreachable or misconfigured")
+    })
+    @PostMapping("/{id}/revoke-sessions")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> revokeSessions(@PathVariable Long id) {
+        userService.revokeUserSessions(id);
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(summary = "Delete a user", description = "Deletes a user by ID. Pagination cache is invalidated.")
