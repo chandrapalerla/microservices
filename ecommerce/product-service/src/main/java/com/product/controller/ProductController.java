@@ -4,6 +4,7 @@ import com.product.dto.request.*;
 import com.product.dto.response.ProductResponse;
 import com.product.dto.response.ProductSummaryResponse;
 import com.product.service.ProductService;
+import com.product.service.S3Service;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -13,9 +14,13 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 /**
  * REST endpoints for Product management.
@@ -47,6 +52,7 @@ import org.springframework.web.bind.annotation.*;
 public class ProductController {
 
     private final ProductService productService;
+    private final S3Service      s3Service;
 
     // ── Public read endpoints ─────────────────────────────────────────────────
 
@@ -72,8 +78,16 @@ public class ProductController {
         return ResponseEntity.ok(productService.search(filter, pageable));
     }
 
+    @Operation(summary = "Full-text search across name, description, and brand",
+               description = "Uses MySQL FULLTEXT index (BOOLEAN MODE). Supports +required, -excluded, \"phrase\" operators. " +
+                             "Returns unranked list of matching ACTIVE products. " +
+                             "Example: q=laptop +gaming -refurbished")
+    @GetMapping("/fulltext-search")
+    public ResponseEntity<List<ProductSummaryResponse>> fullTextSearch(@RequestParam String q) {
+        return ResponseEntity.ok(productService.fullTextSearch(q));
+    }
+
     @Operation(summary = "List ACTIVE products in a specific category (paged)")
-    @GetMapping("/category/{categoryId}")
     public ResponseEntity<Page<ProductSummaryResponse>> getByCategory(
             @PathVariable Long categoryId,
             @ParameterObject @PageableDefault(size = 20, sort = "name") Pageable pageable) {
@@ -168,5 +182,24 @@ public class ProductController {
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         productService.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "Upload a product thumbnail image (ADMIN only)",
+               description = "Accepts JPEG, PNG, WebP, or GIF; max 5 MB. " +
+                             "Stores in S3 / MinIO and updates the product's thumbnailUrl. " +
+                             "Returns the updated product with the new public image URL.")
+    @PostMapping(value = "/{id}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ProductResponse> uploadImage(
+            @PathVariable Long id,
+            @RequestPart("file") MultipartFile file) {
+        String key = "products/" + id + "/" + sanitizeFilename(file.getOriginalFilename());
+        String url = s3Service.upload(key, file);
+        return ResponseEntity.ok(productService.updateThumbnail(id, url));
+    }
+
+    private String sanitizeFilename(String name) {
+        if (name == null || name.isBlank()) return "image";
+        return name.replaceAll("[^a-zA-Z0-9._-]", "_");
     }
 }

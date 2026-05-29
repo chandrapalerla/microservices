@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -142,8 +143,16 @@ public class CategoryService {
     /**
      * Deletes a category.
      * Throws {@link CategoryInUseException} (409) if any products still reference this category.
+     *
+     * Cache strategy: evict both the specific category entry AND all other category entries
+     * (child categories may have a stale parentName after a parent is deleted).
+     * Also evict productsPage — product summary responses embed categoryName.
      */
-    @CacheEvict(value = "categories", allEntries = true)
+    @Caching(evict = {
+            @CacheEvict(value = "categories",    key = "#id"),
+            @CacheEvict(value = "categories",    allEntries = true),
+            @CacheEvict(value = "productsPage",  allEntries = true)
+    })
     @Transactional
     public void delete(Long id) {
         Category category = findById(id);

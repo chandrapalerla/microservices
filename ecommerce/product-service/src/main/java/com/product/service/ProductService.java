@@ -23,10 +23,13 @@ import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * Core business logic for Product management.
@@ -227,8 +230,17 @@ public class ProductService {
      * Deducts stock when an order is placed.
      * Uses @Version optimistic locking — concurrent deductions are safe.
      *
+     * @Retryable retries automatically on ObjectOptimisticLockingFailureException
+     * (two concurrent orders for the same product → one wins, one retries).
+     * Backoff: 50 ms base, 2× multiplier, random jitter — avoids retry storms.
+     *
      * @throws InsufficientStockException if available stock < requested quantity
      */
+    @Retryable(
+        retryFor = ObjectOptimisticLockingFailureException.class,
+        maxAttempts = 3,
+        backoff = @Backoff(delay = 50, multiplier = 2, random = true)
+    )
     @Caching(put = {
             @CachePut(value = "products", key = "#id")
     }, evict = {
@@ -261,7 +273,13 @@ public class ProductService {
 
     /**
      * Restores stock when an order is cancelled or returned.
+     * Also retryable — concurrent restores from batch cancellations can collide.
      */
+    @Retryable(
+        retryFor = ObjectOptimisticLockingFailureException.class,
+        maxAttempts = 3,
+        backoff = @Backoff(delay = 50, multiplier = 2, random = true)
+    )
     @Caching(put = {
             @CachePut(value = "products", key = "#id")
     }, evict = {
@@ -315,6 +333,38 @@ public class ProductService {
         log.info("Admin set stock for product id={} old={} new={}", id, oldQty, newQty);
         eventPublisher.publishStockUpdated(saved, delta);
         return productMapper.toResponse(saved);
+    }
+
+    // ── Image upload ──────────────────────────────────────────────────────────
+
+    @Caching(put = {
+            @CachePut(value = "products", key = "#id")
+    }, evict = {
+            @CacheEvict(value = "productsPage", allEntries = true)
+    })
+    @Transactional
+    public ProductResponse updateThumbnail(Long id, String url) {
+        Product product = findById(id);
+        product.setThumbnailUrl(url);
+        Product saved = productRepository.save(product);
+        log.info("Updated thumbnail for product id={} url={}", id, url);
+        eventPublisher.publishProductUpdated(saved);
+        return productMapper.toResponse(saved);
+    }
+
+    // ── Full-text search ──────────────────────────────────────────────────────
+
+    /**
+     * MySQL FULLTEXT search across name, description, and brand columns.
+     * Uses BOOLEAN MODE so multi-word queries (e.g. "laptop +16gb") are supported.
+     * Falls back to an empty list on parse error — callers should handle gracefully.
+     */
+    @Transactional(readOnly = true)
+    public List<ProductSummaryResponse> fullTextSearch(String query) {
+        return productRepository.fullTextSearch(query)
+                .stream()
+                .map(productMapper::toSummary)
+                .toList();
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

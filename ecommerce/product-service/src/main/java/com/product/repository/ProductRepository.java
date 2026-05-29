@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -40,4 +41,13 @@ public interface ProductRepository extends JpaRepository<Product, Long>,
     Page<Product> findLowStock(@Param("status") ProductStatus status, Pageable pageable);
 
     boolean existsByCategoryId(Long categoryId);
+
+    /**
+     * Full-text search across name, description, and brand using MySQL BOOLEAN MODE.
+     * Requires V4 Flyway migration (FULLTEXT INDEX ft_product_search).
+     * Example query: "laptop +gaming -refurbished"
+     */
+    @Query(value = "SELECT * FROM products WHERE MATCH(name, description, brand) AGAINST (?1 IN BOOLEAN MODE)",
+           nativeQuery = true)
+    List<Product> fullTextSearch(String query);
 }
