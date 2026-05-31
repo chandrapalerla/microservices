@@ -4,25 +4,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Architecture Overview
 
-This is a Spring Boot microservices project with three independent services, each built and run separately:
+This is a Spring Boot microservices project with independent services under `services/`, a React frontend under `client/`, and Kubernetes manifests under `deployment/k8s/`.
 
 ```
 ecommerce/
-├── serviceregistry/   — Netflix Eureka Server (port 8761)
-├── apigateway/        — Spring Cloud Gateway MVC (port 2027)
-├── user-service/      — Core business service (port 2026)
-└── deployment/k8s/    — Kubernetes manifests for all infra
+├── services/
+│   ├── apigateway/      — Spring Cloud Gateway MVC (port 2027)
+│   ├── user-service/    — User management service (port 2026)
+│   ├── product-service/ — Product catalogue service (port 2028)
+│   └── order-service/   — Order management service (port 2029)
+├── client/              — React TypeScript frontend
+└── deployment/k8s/      — Kubernetes manifests for all infra
 ```
 
-**Request flow:** Client → API Gateway (port 2027) → User Service (port 2026), with all services registering with Eureka at 8761.
+**Request flow:** Client → API Gateway (port 2027) → user-service / product-service / order-service via K8s DNS.
 
 ## Build and Run Commands
 
-Each service is a standalone Maven project. Run commands from within each service directory:
+Each service is a standalone Maven project under `services/`. Run commands from within each service directory:
 
 ```powershell
 # Build
-cd user-service
+cd services/user-service
 mvn clean package
 
 # Run
@@ -41,7 +44,7 @@ mvn test -Dtest=MysqlmongodbApplicationTests
 mvn clean compile
 ```
 
-Startup order matters: **serviceregistry → apigateway → user-service** (services register with Eureka on startup).
+Startup order matters: **apigateway → user-service / product-service / order-service** (no service registry required — K8s DNS handles discovery).
 
 ## Infrastructure Dependencies
 
@@ -59,7 +62,7 @@ kubectl apply -f deployment/k8s/databases.yml
 kubectl apply -f deployment/k8s/keycloak.yaml
 ```
 
-For local development without Kubernetes, use Docker Compose targeting the same ports (see `user-service/README.md` for a `docker-compose.yml` snippet).
+For local development without Kubernetes, use Docker Compose targeting the same ports (see `services/user-service/README.md` for a `docker-compose.yml` snippet).
 
 ## Key Architectural Decisions
 
@@ -73,7 +76,7 @@ Both the gateway and user-service use `KeycloakJwtConverter` to extract roles fr
 - `KeycloakJwtConverter.blocking()` / `KeycloakJwtConverter.create()` — for Servlet (gateway SecurityConfig)
 
 ### Caching (Hazelcast)
-Hazelcast is configured via `user-service/src/main/resources/hazelcast.xml`. Four named cache maps:
+Hazelcast is configured via `services/user-service/src/main/resources/hazelcast.xml`. Four named cache maps:
 - `users` — individual user lookups, TTL 10 min, max 1000 entries
 - `usersPage` — paginated results, TTL 5 min, max 500 entries
 - `orders` / `ordersPage` — same pattern for orders (future use)
@@ -81,7 +84,7 @@ Hazelcast is configured via `user-service/src/main/resources/hazelcast.xml`. Fou
 Cache annotations on `UserService`: `@Cacheable`, `@CachePut`, `@CacheEvict`. Write operations must evict `usersPage` (`allEntries=true`) in addition to the individual `users` entry.
 
 ### DTO / MapStruct
-All controller I/O uses `UserDto`, never the JPA `User` entity directly. The `UserMapper` interface is a MapStruct compile-time generated mapper (`componentModel = "spring"`). MapStruct and Lombok annotation processors are both wired in the `maven-compiler-plugin` in `user-service/pom.xml`.
+All controller I/O uses `UserDto`, never the JPA `User` entity directly. The `UserMapper` interface is a MapStruct compile-time generated mapper (`componentModel = "spring"`). MapStruct and Lombok annotation processors are both wired in the `maven-compiler-plugin` in `services/user-service/pom.xml`.
 
 ### Optimistic Locking
 `User` entity has `@Version Long version`. On updates, the client must send the current version. A mismatch returns HTTP 409. The `update()` method in `UserService` deliberately does not copy the version from the request — it relies on Hibernate to detect conflicts.
@@ -90,14 +93,15 @@ All controller I/O uses `UserDto`, never the JPA `User` entity directly. The `Us
 `TokenPropagationFilter` (in gateway) stores the raw JWT as a request attribute (`jwt_token` and `jwt_token_header`) for downstream forwarding. Downstream services validate the same JWT independently as OAuth2 resource servers.
 
 ### Custom AOP Security Annotations
-`@RequiresAdmin` and `@RequiresUser` in `user-service/src/main/java/com/user/aspect/` are custom AOP annotations backed by `AuthorizationAspect`. They check Spring Security context directly. Prefer these for method-level security over `@PreAuthorize` when you need logging.
+`@RequiresAdmin` and `@RequiresUser` in `services/user-service/src/main/java/com/user/aspect/` are custom AOP annotations backed by `AuthorizationAspect`. They check Spring Security context directly. Prefer these for method-level security over `@PreAuthorize` when you need logging.
 
 ## Service Ports and Endpoints
 
 | Service         | Port | Notable Endpoints                                |
 |-----------------|------|--------------------------------------------------|
-| Eureka          | 8761 | `/` (dashboard)                                  |
 | user-service    | 2026 | `/api/v1/users/**`, `/api/v1/auth/**`            |
+| product-service | 2028 | `/api/v1/products/**`, `/api/v1/categories/**`   |
+| order-service   | 2029 | `/api/v1/orders/**`                              |
 | apigateway      | 2027 | `/auth/login`, `/auth/logout`, `/auth/health`    |
 | Keycloak (k8s)  | 30080| `/admin`, `/realms/microservices-realm/...`      |
 
@@ -116,8 +120,9 @@ Roles expected in JWT: `USER`, `ADMIN` (mapped to `ROLE_USER`, `ROLE_ADMIN`).
 
 ## Adding a New Service
 
-1. Create a new Spring Boot project with `spring-cloud-starter-netflix-eureka-client`.
-2. Add `spring.application.name` and `eureka.client.service-url.defaultZone=http://localhost:8761/eureka` to `application.properties`.
+1. Create a new Spring Boot project under `services/<new-service>/`.
+2. Add `spring.application.name` to `application.properties`.
 3. Add `spring-boot-starter-oauth2-resource-server` and configure `spring.security.oauth2.resourceserver.jwt.jwk-set-uri`.
 4. Use `KeycloakJwtConverter` to map Keycloak roles — do not rely on default JWT converter.
-5. Add a route entry in the API Gateway's `application.properties`.
+5. Add a route entry in the API Gateway's `application.yaml` using the K8s DNS URI (e.g. `http://new-service:PORT`).
+6. Create a K8s Service + Deployment + ConfigMap under `deployment/k8s/services/new-service/` and add it to `deployment/k8s/services/kustomization.yaml`.

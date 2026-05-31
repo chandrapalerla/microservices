@@ -1,0 +1,6 @@
+apiVersion: v2
+name: ecommerce-platform
+description: E-commerce microservices platform on Kubernetes
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

@@ -1,0 +1,25 @@
+<configuration>
+
+  <springProperty scope="context" name="appName" source="spring.application.name" defaultValue="apigateway"/>
+
+  <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+      <includeMdcKeyName>traceId</includeMdcKeyName>
+      <includeMdcKeyName>spanId</includeMdcKeyName>
+      <customFields>{"service":"${appName}"}</customFields>
+    </encoder>
+  </appender>
+
+  <!-- Audit trail — one structured JSON event per inbound request -->
+  <logger name="AUDIT" level="INFO" additivity="false">
+    <appender-ref ref="JSON_CONSOLE"/>
+  </logger>
+
+  <logger name="org.springframework.security" level="WARN"/>
+  <logger name="org.springframework.cloud.gateway" level="INFO"/>
+
+  <root level="INFO">
+    <appender-ref ref="JSON_CONSOLE"/>
+  </root>
+
+</configuration>

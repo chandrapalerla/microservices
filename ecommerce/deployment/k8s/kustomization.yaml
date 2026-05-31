@@ -1,0 +1,34 @@
+# ==============================================================================
+# ROOT KUSTOMIZATION
+#
+# "namespace: ecommerce" is declared ONCE here.
+# Kustomize injects it into every namespaced resource automatically —
+# no more copy-pasting "namespace: ecommerce" across 40+ files.
+#
+# Usage
+# ─────
+# Local dev (Docker Desktop / minikube):
+#   kubectl apply -k deployment/k8s/overlays/local
+#
+# Production:
+#   kubectl apply -k deployment/k8s/overlays/production
+#
+# Dry-run (preview what would be applied):
+#   kubectl kustomize deployment/k8s/overlays/local
+#
+# ==============================================================================
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# ── Single source of truth for namespace ─────────────────────────────────────
+namespace: ecommerce
+
+# ── Resources ─────────────────────────────────────────────────────────────────
+resources:
+  - namespace.yaml     # Namespace created once; Kustomize skips injecting namespace into it
+  - databases.yml
+  - keycloak.yaml
+  - kafka.yml
+  - observability.yml
+  - services/          # delegates to services/kustomization.yaml
