@@ -44,8 +44,8 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
               error
                 ? 'border-red-400 focus:ring-red-400 dark:border-red-500'
                 : 'border-gray-300 dark:border-gray-600',
-              leftAddon  && 'pl-10',
-              rightAddon && 'pr-10',
+              !!leftAddon  && 'pl-10',
+              !!rightAddon && 'pr-10',
               className,
             )}
             {...props}

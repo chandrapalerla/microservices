@@ -28,6 +28,7 @@
         <join>
             <multicast enabled="false"/>
             <tcp-ip enabled="false"/>
+            <kubernetes enabled="false"/>
         </join>
         <interfaces enabled="false">
             <interface>127.0.0.1</interface>

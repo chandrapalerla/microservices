@@ -70,7 +70,9 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(Arrays.asList(
-                "http://localhost:5173",    // React / frontend apps
+                "http://localhost:5173",    // Vite dev server
+                "http://localhost:30500",   // deployed client (K8s NodePort)
+                "http://ecommerce.local",   // Ingress hostname
                 "http://localhost:2026"     // Swagger UI (user-service) — dev only
         ));
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));

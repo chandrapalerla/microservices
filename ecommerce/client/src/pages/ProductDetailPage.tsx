@@ -51,11 +51,13 @@ export default function ProductDetailPage() {
   const hasDiscount = product.originalPrice && product.originalPrice > product.price
 
   function handleAddToCart() {
+    if (!product) return
     addItem(product, qty)
     setQty(1)
   }
 
   function handleBuyNow() {
+    if (!product) return
     addItem(product, qty)
     navigate('/cart')
   }

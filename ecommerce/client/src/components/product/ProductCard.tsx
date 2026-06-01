@@ -5,7 +5,6 @@ import { ShoppingCart, Check, Tag } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useCart } from '@/context/CartContext'
 import { Button } from '@/components/ui/Button'
-import { Badge } from '@/components/ui/Badge'
 import type { ProductSummary } from '@/types'
 import { formatINR } from '@/utils/formatDate'
 

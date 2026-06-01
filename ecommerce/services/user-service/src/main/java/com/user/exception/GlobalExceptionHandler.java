@@ -1,6 +1,7 @@
 package com.user.exception;
 
 import jakarta.validation.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -42,6 +43,17 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Object> handleOptimisticLock(ObjectOptimisticLockingFailureException ex) {
         return body(HttpStatus.CONFLICT, "Conflict",
                 "The record was modified by another request. Reload and try again.", null);
+    }
+
+    // ─── 409 Conflict — unique constraint violation (e.g. duplicate email) ───
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Object> handleDataIntegrity(DataIntegrityViolationException ex) {
+        String msg = "A record with the same unique value already exists.";
+        if (ex.getMessage() != null && ex.getMessage().toLowerCase().contains("email")) {
+            msg = "A user with this email address already exists.";
+        }
+        return body(HttpStatus.CONFLICT, "Conflict", msg, null);
     }
 
     // ─── 400 Bad Request — bean validation (WebFlux) ─────────────────────────
