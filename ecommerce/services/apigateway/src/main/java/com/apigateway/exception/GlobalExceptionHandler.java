@@ -1,5 +1,6 @@
 package com.apigateway.exception;
 
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.micrometer.tracing.Tracer;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
@@ -8,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.client.HttpClientErrorException;
@@ -80,6 +82,28 @@ public class GlobalExceptionHandler {
         log.warn("Access denied [{} {}]: {}", req.getMethod(), req.getRequestURI(), ex.getMessage());
         return build(HttpStatus.FORBIDDEN,
                 "You do not have permission to access this resource.", req);
+    }
+
+    // ── 401 — authentication required ────────────────────────────────────────
+    // AuthenticationException can propagate to @RestControllerAdvice in Spring
+    // Cloud Gateway MVC when the security entry point doesn't intercept it first
+    // (e.g. missing/invalid Bearer token on a protected route).
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ErrorResponse> handleAuthentication(AuthenticationException ex,
+                                                               HttpServletRequest req) {
+        log.debug("Authentication required [{} {}]: {}", req.getMethod(), req.getRequestURI(), ex.getMessage());
+        return build(HttpStatus.UNAUTHORIZED, "Authentication required. Please log in.", req);
+    }
+
+    // ── 503 — circuit breaker open ────────────────────────────────────────────
+    // Thrown by Resilience4j when the circuit is OPEN and the request is rejected
+    // before being forwarded to the downstream service.
+    @ExceptionHandler(CallNotPermittedException.class)
+    public ResponseEntity<ErrorResponse> handleCircuitBreakerOpen(CallNotPermittedException ex,
+                                                                    HttpServletRequest req) {
+        log.warn("Circuit breaker OPEN — request blocked [{} {}]: {}", req.getMethod(), req.getRequestURI(), ex.getMessage());
+        return build(HttpStatus.SERVICE_UNAVAILABLE,
+                "The service is temporarily unavailable due to repeated failures. Please try again shortly.", req);
     }
 
     // ── 500 — catch-all ───────────────────────────────────────────────────────
