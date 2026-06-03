@@ -73,10 +73,16 @@ export default function CheckoutPage() {
   })
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH_ON_DELIVERY')
 
-  const { data: profile } = useQuery({
+  const {
+    data: profile,
+    isLoading: isProfileLoading,
+    isError: isProfileError,
+    refetch: refetchProfile,
+  } = useQuery({
     queryKey: ['my-profile'],
     queryFn:  getMyProfile,
     staleTime: 300_000,
+    retry: 2,
   })
 
   const shipping = subtotal >= 500 ? 0 : 50
@@ -274,10 +280,22 @@ export default function CheckoutPage() {
               </div>
             </dl>
 
+            {isProfileError && (
+              <div className="mb-3 flex items-center justify-between rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-3 py-2 text-sm text-red-600 dark:text-red-400">
+                <span>Could not load your profile.</span>
+                <button
+                  onClick={() => refetchProfile()}
+                  className="ml-3 underline text-red-700 dark:text-red-300 font-medium"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
             <button
               onClick={handlePlaceOrder}
-              disabled={isPending}
-              className="mt-5 w-full bg-[#FF9900] hover:bg-[#F3A847] disabled:opacity-60 text-[#131921] font-bold py-3 rounded-full transition-colors flex items-center justify-center gap-2"
+              disabled={isPending || isProfileLoading || !profile}
+              className="mt-5 w-full bg-[#FF9900] hover:bg-[#F3A847] disabled:opacity-60 disabled:cursor-not-allowed text-[#131921] font-bold py-3 rounded-full transition-colors flex items-center justify-center gap-2"
             >
               {isPending ? (
                 <span className="flex items-center gap-2">
@@ -286,6 +304,14 @@ export default function CheckoutPage() {
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
                   Placing order…
+                </span>
+              ) : isProfileLoading ? (
+                <span className="flex items-center gap-2">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Loading profile…
                 </span>
               ) : (
                 <>

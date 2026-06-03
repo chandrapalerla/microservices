@@ -6,6 +6,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
@@ -59,6 +60,20 @@ public class GlobalExceptionHandler {
         problem.setType(URI.create("https://api.ecommerce.example.com/errors/insufficient-stock"));
         problem.setProperty("timestamp", Instant.now());
         return ResponseEntity.status(HttpStatus.CONFLICT).body(problem);
+    }
+
+    // ── 400 Bad Request — unreadable / unparseable request body ──────────────
+    // Covers: unknown enum values, malformed JSON, type mismatches.
+    // Without this, the catch-all returns 500 which trips the gateway circuit breaker.
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ProblemDetail> handleNotReadable(HttpMessageNotReadableException ex) {
+        log.warn("Unreadable request body: {}", ex.getMostSpecificCause().getMessage());
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST, ex.getMostSpecificCause().getMessage());
+        problem.setTitle("Invalid Request Body");
+        problem.setType(URI.create("https://api.ecommerce.example.com/errors/bad-request"));
+        problem.setProperty("timestamp", Instant.now());
+        return ResponseEntity.badRequest().body(problem);
     }
 
     // ── 400 Bad Request — Bean Validation failures ────────────────────────────
@@ -128,12 +143,30 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(problem);
     }
 
-    // ── 502 Bad Gateway — Feign client errors (downstream service error) ───────
+    // ── Feign client errors (downstream service responses) ────────────────────
+    //
+    // Rules:
+    //  4xx from downstream → pass the same 4xx back to the caller.
+    //       These are data/auth errors, NOT infrastructure failures.
+    //       Returning 502 here would cause the API gateway's circuit breaker
+    //       to trip on client mistakes, which is wrong.
+    //  5xx or connection error (status == -1) → 502 Bad Gateway.
+    //       These represent a real downstream infrastructure failure.
     @ExceptionHandler(FeignException.class)
     public ResponseEntity<ProblemDetail> handleFeignException(FeignException ex) {
-        log.error("Downstream service error (status {}): {}", ex.status(), ex.getMessage());
+        int status = ex.status();
+        log.error("Downstream service error (status {}): {}", status, ex.getMessage());
 
-        if (ex.status() == 404) {
+        if (status == 401 || status == 403) {
+            ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                    HttpStatus.valueOf(status),
+                    "Not authorised to access a required downstream resource");
+            problem.setTitle(status == 401 ? "Unauthorized" : "Forbidden");
+            problem.setProperty("timestamp", Instant.now());
+            return ResponseEntity.status(status).body(problem);
+        }
+
+        if (status == 404) {
             ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                     HttpStatus.NOT_FOUND, "Referenced resource not found in downstream service");
             problem.setTitle("Downstream Resource Not Found");
@@ -141,18 +174,29 @@ public class GlobalExceptionHandler {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(problem);
         }
 
-        if (ex.status() == 503 || ex instanceof FeignException.ServiceUnavailable) {
+        if (status == 409) {
             ProblemDetail problem = ProblemDetail.forStatusAndDetail(
-                    HttpStatus.SERVICE_UNAVAILABLE, "A dependent service is currently unavailable. Please retry.");
+                    HttpStatus.CONFLICT, "Conflict reported by downstream service");
+            problem.setTitle("Downstream Conflict");
+            problem.setProperty("timestamp", Instant.now());
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(problem);
+        }
+
+        if (status == 503 || ex instanceof FeignException.ServiceUnavailable) {
+            ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "A dependent service is currently unavailable. Please retry.");
             problem.setTitle("Service Unavailable");
             problem.setProperty("timestamp", Instant.now());
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(problem);
         }
 
+        // 5xx or no HTTP response (connection refused, timeout — status == -1)
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
-                HttpStatus.BAD_GATEWAY, "An error occurred while communicating with a downstream service");
+                HttpStatus.BAD_GATEWAY,
+                "An error occurred while communicating with a downstream service");
         problem.setTitle("Bad Gateway");
-        problem.setProperty("downstreamStatus", ex.status());
+        problem.setProperty("downstreamStatus", status);
         problem.setProperty("timestamp", Instant.now());
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(problem);
     }

@@ -7,6 +7,7 @@ import com.user.exception.ResourceNotFoundException;
 import com.user.mapper.UserMapper;
 import com.user.repository.UserRepository;
 import com.user.service.UserService;
+import org.springframework.transaction.annotation.Transactional;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -46,18 +47,35 @@ public class UserController {
                      content = @Content(schema = @Schema(implementation = UserDto.class))),
         @ApiResponse(responseCode = "404", description = "No DB user matches the JWT email")
     })
-    @Deprecated
     @GetMapping("/me")
+    @Transactional
     public ResponseEntity<UserDto> getMe(@AuthenticationPrincipal Jwt jwt) {
         String email = jwt.getClaimAsString("email");
         if (email == null || email.isBlank()) {
-            // Fall back to preferred_username as email (some Keycloak configs omit email claim)
             email = jwt.getClaimAsString("preferred_username");
         }
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "No user record found for the authenticated account. " +
-                        "Please ask an admin to create your profile."));
+        final String resolvedEmail = email;
+
+        User user = userRepository.findByEmail(resolvedEmail)
+                .orElseGet(() -> {
+                    // First login: auto-provision a DB profile from the JWT claims.
+                    String name = jwt.getClaimAsString("name");
+                    if (name == null || name.isBlank()) {
+                        String given  = jwt.getClaimAsString("given_name");
+                        String family = jwt.getClaimAsString("family_name");
+                        if (given != null && family != null) {
+                            name = (given + " " + family).trim();
+                        }
+                    }
+                    if (name == null || name.isBlank()) {
+                        name = jwt.getClaimAsString("preferred_username");
+                    }
+                    User newUser = new User();
+                    newUser.setEmail(resolvedEmail);
+                    newUser.setName(name != null ? name : resolvedEmail);
+                    return userService.create(newUser);
+                });
+
         return ResponseEntity.ok(userMapper.toDto(user));
     }
 
