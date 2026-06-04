@@ -79,8 +79,12 @@ public class OrderController {
     public Page<OrderResponse> getMyOrders(
             Authentication authentication,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        Long userId = requireUserId(authentication);
-        return orderService.getByUserId(userId, pageable);
+        Long userId = getUserIdFromJwt(authentication);
+        if (userId != null) {
+            return orderService.getByUserId(userId, pageable);
+        }
+        // Fallback: use username (email) from JWT when user_db_id claim is absent
+        return orderService.getByUserEmail(authentication.getName(), pageable);
     }
 
     @Operation(summary = "Get order by ID",

@@ -30,9 +30,10 @@ image_for() {
     apigateway)      echo "ecommerce/apigateway:latest" ;;
     user-service)    echo "ecommerce/user-service:latest" ;;
     product-service) echo "ecommerce/product-service:latest" ;;
-    order-service)   echo "ecommerce/order-service:latest" ;;
-    client)          echo "ecommerce/client:latest" ;;
-    *) echo "ERROR: Unknown service '$1'. Valid: apigateway, user-service, product-service, order-service, client" >&2; exit 1 ;;
+    order-service)    echo "ecommerce/order-service:latest" ;;
+    payment-service)  echo "ecommerce/payment-service:latest" ;;
+    client)           echo "ecommerce/client:latest" ;;
+    *) echo "ERROR: Unknown service '$1'. Valid: apigateway, user-service, product-service, order-service, payment-service, client" >&2; exit 1 ;;
   esac
 }
 
@@ -66,6 +67,7 @@ if [[ "$TARGET" == "all" ]]; then
   build_and_restart user-service
   build_and_restart product-service
   build_and_restart order-service
+  build_and_restart payment-service
   build_and_restart client
 else
   build_and_restart "$TARGET"
@@ -73,4 +75,4 @@ fi
 
 echo ""
 echo "==> All done."
-kubectl get pods -n "$NAMESPACE" -l "app in (apigateway,user-service,product-service,order-service,client)"
+kubectl get pods -n "$NAMESPACE" -l "app in (apigateway,user-service,product-service,order-service,payment-service,client)"

@@ -224,24 +224,27 @@ export function StorefrontLayout() {
           </div>
         </div>
 
-        {/* ── Category nav bar ───────────────────────────────────────────────── */}
+        {/* ── Nav bar ────────────────────────────────────────────────────────── */}
         <nav className="bg-[#232f3e] hidden lg:block">
-          <div className="max-w-[1500px] mx-auto px-3 flex items-center gap-1 overflow-x-auto scrollbar-hide">
+          <div className="max-w-[1500px] mx-auto px-3 flex items-center gap-1">
             <NavLink
               to="/shop"
-              className="px-3 py-2 text-sm text-white/90 hover:bg-[#37475a] whitespace-nowrap rounded"
+              className={({ isActive }) =>
+                `px-3 py-2 text-sm text-white/90 hover:bg-[#37475a] whitespace-nowrap rounded ${isActive ? 'bg-[#37475a]' : ''}`
+              }
             >
               All Products
             </NavLink>
-            {categories.slice(0, 10).map((cat) => (
+            {isAdmin && (
               <NavLink
-                key={cat.id}
-                to={`/shop?categoryId=${cat.id}`}
-                className="px-3 py-2 text-sm text-white/90 hover:bg-[#37475a] whitespace-nowrap rounded"
+                to="/admin/dashboard"
+                className={({ isActive }) =>
+                  `px-3 py-2 text-sm whitespace-nowrap rounded flex items-center gap-1.5 ${isActive ? 'bg-purple-700 text-white' : 'text-purple-300 hover:bg-[#37475a] hover:text-purple-200'}`
+                }
               >
-                {cat.name}
+                <ShieldCheck size={14} /> Admin Panel
               </NavLink>
-            ))}
+            )}
           </div>
         </nav>
 

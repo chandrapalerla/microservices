@@ -38,6 +38,13 @@ data:
             labels:
               service: product-service
 
+      - job_name: payment-service
+        metrics_path: /actuator/prometheus
+        static_configs:
+          - targets: ['payment-service.ecommerce.svc.cluster.local:2030']
+            labels:
+              service: payment-service
+
       - job_name: kubernetes-pods
         kubernetes_sd_configs:
           - role: pod

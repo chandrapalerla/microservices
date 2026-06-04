@@ -41,6 +41,7 @@ build_if_missing "ecommerce/apigateway:latest"      "$ECOMMERCE_ROOT/services/ap
 build_if_missing "ecommerce/user-service:latest"    "$ECOMMERCE_ROOT/services/user-service"
 build_if_missing "ecommerce/product-service:latest" "$ECOMMERCE_ROOT/services/product-service"
 build_if_missing "ecommerce/order-service:latest"   "$ECOMMERCE_ROOT/services/order-service"
+build_if_missing "ecommerce/payment-service:latest" "$ECOMMERCE_ROOT/services/payment-service"
 build_if_missing "ecommerce/client:latest"          "$ECOMMERCE_ROOT/client"
 
 # ── Install NGINX Ingress Controller if not already installed ─────────────────
@@ -84,6 +85,7 @@ kubectl apply -n "$NAMESPACE" -f "$ROOT/templates/applications/api-gateway/secre
 kubectl apply -n "$NAMESPACE" -f "$ROOT/templates/applications/user-service/secret.yaml"
 kubectl apply -n "$NAMESPACE" -f "$ROOT/templates/applications/product-service/secret.yaml"
 kubectl apply -n "$NAMESPACE" -f "$ROOT/templates/applications/order-service/secret.yaml"
+kubectl apply -n "$NAMESPACE" -f "$ROOT/templates/applications/payment-service/secret.yaml"
 
 echo "==> Deploying application: API Gateway"
 kubectl apply -n "$NAMESPACE" -f "$ROOT/templates/applications/api-gateway/configmap.yaml"
@@ -107,6 +109,13 @@ kubectl apply -n "$NAMESPACE" -f "$ROOT/templates/applications/order-service/con
 kubectl apply -n "$NAMESPACE" -f "$ROOT/templates/applications/order-service/deployment.yaml"
 kubectl apply -n "$NAMESPACE" -f "$ROOT/templates/applications/order-service/service.yaml"
 kubectl apply -n "$NAMESPACE" -f "$ROOT/templates/applications/order-service/hpa.yaml"
+
+echo "==> Deploying application: Payment Service"
+kubectl apply -n "$NAMESPACE" -f "$ROOT/templates/applications/payment-service/secret.yaml"
+kubectl apply -n "$NAMESPACE" -f "$ROOT/templates/applications/payment-service/configmap.yaml"
+kubectl apply -n "$NAMESPACE" -f "$ROOT/templates/applications/payment-service/deployment.yaml"
+kubectl apply -n "$NAMESPACE" -f "$ROOT/templates/applications/payment-service/service.yaml"
+kubectl apply -n "$NAMESPACE" -f "$ROOT/templates/applications/payment-service/hpa.yaml"
 
 echo "==> Deploying application: Client (React)"
 kubectl apply -n "$NAMESPACE" -f "$ROOT/templates/applications/client/deployment.yaml"

@@ -55,7 +55,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/products/**").hasAnyRole("USER", "ADMIN")
                 .requestMatchers("/api/v1/categories/**").hasRole("ADMIN")
 
-                // ── Future services: add path matchers here ───────────────
+                // ── Payment service ───────────────────────────────────────
+                .requestMatchers("/api/v1/payments/**").hasAnyRole("USER", "ADMIN")
 
                 .anyRequest().authenticated()
             )

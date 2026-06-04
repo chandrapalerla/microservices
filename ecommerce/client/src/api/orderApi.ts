@@ -10,8 +10,9 @@ export interface ShipOrderDto {
 
 // ─── Create ───────────────────────────────────────────────────────────────────
 
-export async function createOrder(req: OrderRequest): Promise<Order> {
-  const { data } = await api.post<Order>(BASE, req)
+export async function createOrder(req: OrderRequest, idempotencyKey?: string): Promise<Order> {
+  const headers = idempotencyKey ? { 'X-Idempotency-Key': idempotencyKey } : {}
+  const { data } = await api.post<Order>(BASE, req, { headers })
   return data
 }
 

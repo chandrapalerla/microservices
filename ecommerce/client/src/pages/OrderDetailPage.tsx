@@ -1,8 +1,9 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, MapPin, Package, XCircle, RotateCcw, Truck } from 'lucide-react'
+import { ArrowLeft, MapPin, Package, XCircle, RotateCcw, Truck, RefreshCw } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getOrderById, getOrderHistory, cancelOrder, requestReturn } from '@/api/orderApi'
+import { getPaymentByOrderId, retryPayment } from '@/api/paymentApi'
 import { OrderStatusTimeline } from '@/components/order/OrderStatusTimeline'
 import { Spinner } from '@/components/ui/Spinner'
 import { formatDate, formatDateTime, formatINR } from '@/utils/formatDate'
@@ -39,6 +40,24 @@ export default function OrderDetailPage() {
     queryFn:  () => getOrderHistory(orderId),
     enabled:  !!orderId,
     staleTime: 30_000,
+  })
+
+  const { data: payment } = useQuery({
+    queryKey: ['payment', orderId],
+    queryFn:  () => getPaymentByOrderId(orderId),
+    enabled:  !!orderId,
+    staleTime: 15_000,
+    retry: 1,
+  })
+
+  const { mutate: doRetry, isPending: retrying } = useMutation({
+    mutationFn: () => retryPayment(orderId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['payment', orderId] })
+      qc.invalidateQueries({ queryKey: ['order', orderId] })
+      toast.success('Payment retry initiated')
+    },
+    onError: () => toast.error('Retry failed — please try again'),
   })
 
   const { mutate: doCancel, isPending: cancelling } = useMutation({
@@ -164,6 +183,18 @@ export default function OrderDetailPage() {
                 {order.paymentStatus}
               </dd>
             </div>
+            {payment?.gatewayProvider && (
+              <div className="flex justify-between">
+                <dt className="text-gray-500">Gateway</dt>
+                <dd className="font-medium text-gray-900 dark:text-gray-100">{payment.gatewayProvider}</dd>
+              </div>
+            )}
+            {payment?.gatewayTxnId && (
+              <div className="flex justify-between">
+                <dt className="text-gray-500">Txn ID</dt>
+                <dd className="font-mono text-xs text-gray-600 dark:text-gray-400 max-w-[140px] truncate">{payment.gatewayTxnId}</dd>
+              </div>
+            )}
             {order.paymentReference && (
               <div className="flex justify-between">
                 <dt className="text-gray-500">Reference</dt>
@@ -171,6 +202,23 @@ export default function OrderDetailPage() {
               </div>
             )}
           </dl>
+          {payment?.status === 'FAILED' && (
+            <div className="mt-3 space-y-2">
+              {payment.failureReason && (
+                <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded p-2">
+                  {payment.failureReason}
+                </p>
+              )}
+              <button
+                onClick={() => doRetry()}
+                disabled={retrying}
+                className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+              >
+                {retrying ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                Retry Payment
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

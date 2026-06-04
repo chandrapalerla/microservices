@@ -17,6 +17,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     Page<Order> findByUserId(Long userId, Pageable pageable);
 
+    Page<Order> findByUserEmailIgnoreCase(String userEmail, Pageable pageable);
+
     Page<Order> findByStatus(OrderStatus status, Pageable pageable);
 
     @Query("SELECT COUNT(o) FROM Order o WHERE YEAR(o.createdAt) = :year")

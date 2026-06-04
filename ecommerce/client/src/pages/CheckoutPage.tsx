@@ -1,7 +1,7 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useRef } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
-import { MapPin, CreditCard, CheckCircle, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react'
+import { MapPin, CreditCard, CheckCircle, AlertCircle, ChevronDown, ChevronUp, ArrowLeft } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { createOrder } from '@/api/orderApi'
 import { getMyProfile } from '@/api/userApi'
@@ -63,6 +63,8 @@ function Field({
 export default function CheckoutPage() {
   const navigate = useNavigate()
   const { items, subtotal, clearCart } = useCart()
+  // Stable per checkout session — prevents duplicate orders on double-click
+  const idempotencyKey = useRef(crypto.randomUUID())
 
   const [addressOpen, setAddressOpen] = useState(true)
   const [paymentOpen, setPaymentOpen] = useState(false)
@@ -98,7 +100,7 @@ export default function CheckoutPage() {
         items:  items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
         shippingAddress: address,
         paymentMethod,
-      })
+      }, idempotencyKey.current)
     },
     onSuccess: (order) => {
       clearCart()
@@ -142,6 +144,12 @@ export default function CheckoutPage() {
 
   return (
     <div className="max-w-[1100px] mx-auto px-4 py-8">
+      <Link
+        to="/cart"
+        className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 mb-5"
+      >
+        <ArrowLeft size={14} /> Back to Cart
+      </Link>
       <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Checkout</h1>
 
       <div className="flex flex-col lg:flex-row gap-6">

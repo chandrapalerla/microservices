@@ -190,6 +190,28 @@ export interface OrderRequest {
   notes?: string
 }
 
+// ─── Payment Types ────────────────────────────────────────────────────────────
+
+export type PaymentGatewayStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'REFUNDED' | 'REFUND_FAILED'
+export type GatewayProvider = 'RAZORPAY' | 'COD' | 'MOCK'
+
+export interface Payment {
+  id: number
+  orderId: number
+  orderNumber: string
+  userId: number
+  paymentMethod: PaymentMethod
+  gatewayProvider: GatewayProvider | null
+  gatewayTxnId: string | null
+  amount: number
+  currency: string
+  status: PaymentGatewayStatus
+  failureReason: string | null
+  retryCount: number
+  createdAt: string
+  updatedAt: string
+}
+
 // ─── Pagination ───────────────────────────────────────────────────────────────
 
 export interface Page<T> {

@@ -1,0 +1,20 @@
+CREATE TABLE payments (
+    id               BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    version          BIGINT       NOT NULL DEFAULT 0,
+    order_id         BIGINT       NOT NULL,
+    order_number     VARCHAR(30)  NOT NULL,
+    user_id          BIGINT       NOT NULL,
+    payment_method   VARCHAR(30)  NOT NULL,
+    gateway_provider VARCHAR(30),
+    gateway_txn_id   VARCHAR(200),
+    amount           DECIMAL(12,2) NOT NULL,
+    currency         VARCHAR(10)  NOT NULL DEFAULT 'INR',
+    status           VARCHAR(30)  NOT NULL DEFAULT 'PENDING',
+    failure_reason   TEXT,
+    retry_count      INT          NOT NULL DEFAULT 0,
+    created_at       DATETIME(6)  NOT NULL,
+    updated_at       DATETIME(6),
+    CONSTRAINT ux_payments_order_id UNIQUE (order_id),
+    INDEX idx_payments_status        (status),
+    INDEX idx_payments_gateway_txn_id (gateway_txn_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

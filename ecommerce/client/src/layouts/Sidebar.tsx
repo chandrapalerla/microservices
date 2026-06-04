@@ -1,7 +1,7 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, Link } from 'react-router-dom'
 import {
   LayoutDashboard, Users, ShieldCheck, X, Package,
-  Tag, ShoppingBag, ClipboardList,
+  Tag, ShoppingBag, ClipboardList, ArrowLeft,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { ROLES, APP_NAME } from '@/constants'
@@ -119,14 +119,22 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
       </nav>
 
       {/* Footer */}
-      {hasRole(ROLES.ADMIN) && (
-        <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-3">
+      <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-3 space-y-2">
+        <Link
+          to="/"
+          onClick={onClose}
+          className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+        >
+          <ArrowLeft size={15} />
+          Back to Store
+        </Link>
+        {hasRole(ROLES.ADMIN) && (
           <div className="flex items-center gap-2 text-xs text-purple-600 dark:text-purple-400">
             <ShieldCheck size={14} />
             <span>Admin access</span>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }

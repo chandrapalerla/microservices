@@ -22,6 +22,7 @@ kubectl delete -n "$NAMESPACE" -f "$ROOT/templates/applications/order-service/" 
 kubectl delete -n "$NAMESPACE" -f "$ROOT/templates/applications/product-service/" --ignore-not-found
 kubectl delete -n "$NAMESPACE" -f "$ROOT/templates/applications/user-service/" --ignore-not-found
 kubectl delete -n "$NAMESPACE" -f "$ROOT/templates/applications/api-gateway/" --ignore-not-found
+kubectl delete -n "$NAMESPACE" -f "$ROOT/templates/applications/payment-service/" --ignore-not-found
 
 echo "==> Removing infrastructure"
 kubectl delete -n "$NAMESPACE" -f "$ROOT/templates/infrastructure/keycloak/" --ignore-not-found

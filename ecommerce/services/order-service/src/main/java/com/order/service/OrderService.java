@@ -143,6 +143,11 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
+    public Page<OrderResponse> getByUserEmail(String email, Pageable pageable) {
+        return orderRepository.findByUserEmailIgnoreCase(email, pageable).map(orderMapper::toResponse);
+    }
+
+    @Transactional(readOnly = true)
     public OrderResponse getByOrderNumber(String orderNumber) {
         Order order = orderRepository.findByOrderNumber(orderNumber)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "orderNumber", orderNumber));
@@ -466,6 +471,47 @@ public class OrderService {
         appendHistory(saved, from, newStatus, req.getReason(), changedBy);
         saveToOutbox(saved.getId(), "ORDER_" + newStatus.name(), req.getReason());
         return orderMapper.toResponse(saved);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PAYMENT SAGA CALLBACKS  (driven by payment-events Kafka topic)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Called by PaymentEventConsumer when payment-service publishes PAYMENT_FAILED.
+     * Transitions order PENDING → PAYMENT_FAILED and restores stock.
+     */
+    @Transactional
+    @Caching(evict = {
+        @CacheEvict(value = "orders",     key = "#id"),
+        @CacheEvict(value = "ordersPage", allEntries = true)
+    })
+    public void markPaymentFailed(Long id, String reason) {
+        Order order = orderRepository.findById(id).orElse(null);
+        if (order == null) {
+            log.warn("PAYMENT_FAILED received for unknown orderId={}", id);
+            return;
+        }
+        if (order.getStatus() != OrderStatus.PENDING) {
+            log.info("Order {} already in status {}; skipping PAYMENT_FAILED", id, order.getStatus());
+            return;
+        }
+
+        OrderStatus from = order.getStatus();
+        order.setStatus(OrderStatus.PAYMENT_FAILED);
+        order.setPaymentStatus(PaymentStatus.FAILED);
+        Order saved = orderRepository.saveAndFlush(order);
+
+        appendHistory(saved, from, OrderStatus.PAYMENT_FAILED, reason, "payment-service");
+        saveToOutbox(saved.getId(), "ORDER_PAYMENT_FAILED", reason);
+
+        // Restore stock — same compensation path as cancellation
+        for (OrderItem item : saved.getItems()) {
+            self.restoreProductStock(saved.getId(), item.getProductId(), item.getQuantity());
+        }
+
+        orderMetrics.recordTransition(from.name(), OrderStatus.PAYMENT_FAILED.name());
+        log.info("Order {} transitioned to PAYMENT_FAILED", id);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

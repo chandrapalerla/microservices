@@ -41,9 +41,13 @@ public class OrderEvent {
     private Long userId;
     private String userEmail;
 
+    /** Required by payment-service to route to the correct gateway. */
+    private String paymentMethod;
+
     private List<OrderEventItem> items;
 
     private BigDecimal totalAmount;
+    private String currency;
     private String trackingNumber;
     private String reason;
 

@@ -117,6 +117,21 @@ spring:
                       - 502
                       - 503
                       - 504
+            - id: payment-service
+              uri: http://payment-service:2030
+              predicates:
+                - Path=/api/v1/payments/**
+              filters:
+                - AddRequestHeader=X-Gateway-Secret, ${gateway.internal-secret}
+                - name: CircuitBreaker
+                  args:
+                    id: payment-service
+                    fallbackUri: forward:/fallback/service-unavailable
+                    statusCodes:
+                      - 500
+                      - 502
+                      - 503
+                      - 504
 gateway:
   internal-secret: gw-secret-change-in-prod
 
@@ -156,6 +171,9 @@ resilience4j:
         wait-duration-in-open-state: 20s
       product-service:
         base-config: default
+      payment-service:
+        base-config: default
+        failure-rate-threshold: 40
 
 management:
   endpoints:
